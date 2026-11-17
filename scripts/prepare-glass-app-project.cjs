@@ -35,6 +35,15 @@ function prepare(root, work) {
   // Preserve all App source/resource entries; remove core copy phases, assembled from original IPA later.
   target.buildPhases = target.buildPhases.filter(id => objects[id].isa !== 'PBXCopyFilesBuildPhase');
   const usedRefs = new Set(target.buildPhases.flatMap(id => objects[id].files || []).map(id => objects[id].fileRef).filter(Boolean));
+  // Xcode 16.4 optimizes the baseline strrchr(constant, character) into unavailable memrchr.
+  // Keep its original libc call for this source only, without touching bootstrap/version logic.
+  for (const id of objects[target.buildPhases.find(id => objects[id].isa === 'PBXSourcesBuildPhase')].files) {
+    const buildFile = objects[id];
+    if (objects[buildFile.fileRef]?.path === 'DOBootstrapper.m') {
+      buildFile.settings ||= {};
+      buildFile.settings.COMPILER_FLAGS = ((buildFile.settings.COMPILER_FLAGS || '') + ' -fno-builtin-strrchr').trim();
+    }
+  }
   for (const [objectID, object] of Object.entries(objects)) {
     if(object.isa==='PBXBuildFile' && object.settings?.ATTRIBUTES)
       object.settings.ATTRIBUTES = object.settings.ATTRIBUTES.filter(a => a !== 'CodeSignOnCopy' && a !== 'RemoveHeadersOnCopy');
