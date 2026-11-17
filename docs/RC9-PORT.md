@@ -70,7 +70,7 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
 
 ## 当前构建限制
 
-本机为 Windows，没有 Xcode/iOS SDK。云端已运行 macOS/Foundation 回归；完整 App 尚未构建成功，UIKit 程序编译通过但安装超时，运行验证未完成，Secure Enclave 真机验证未执行。
+本机为 Windows，没有 Xcode/iOS SDK。云端已运行 macOS/Foundation 回归；独立 App + 官方预编译底层路线现已成功编译、签名和生成 IPA/TIPA（运行 44094121720，源码提交 a96f416）。全源码底层重建仍受下述依赖问题阻断；UIKit 程序编译通过但安装超时，运行验证未完成，Secure Enclave 真机验证未执行。
 
 补齐依赖时，`BaseBin/ChOma` 锁定提交 `4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6` 无法从上游配置的 `opa334/ChOma` 仓库取得，Git 报 `not our ref`。已把未完成检出恢复为未初始化状态，**没有使用 main 或更改 gitlink**；其余顶层可用子模块按原锁定提交检出，XPF 嵌套依赖尚未全部初始化。
 
@@ -85,7 +85,7 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
 5. 运行回归、macOS 原生构建、包内权限/资源检查、模拟器布局和真机授权/越狱验收。
 6. 真机至少覆盖：未授权仍可使用原越狱；合法旧/新授权、错误设备/无效码、撤销失败；头像/静态和动态壁纸；前后台、重新加载、重启；原 ZQBB 主题、备用图标、设置、包管理器和原支持范围。
 
-源码已按用户请求提交并推送至其 GitHub 仓库以执行构建。没有发布安装包或设置自动升级；后续构建记录须继续区分源码回归、原生 UIKit 验证和完整 App 打包结果。
+源码已按用户请求提交并推送至其 GitHub 仓库以执行构建。测试安装包已在 Actions Artifact 中生成，没有发布 Release 或设置自动升级；后续构建记录须继续区分源码回归、原生 UIKit 验证和 App 打包结果。
 
 ## 独立 App / 官方预编译底层构建路线
 
@@ -98,4 +98,10 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
 - 产物仅为 TEST CANDIDATE，不是全源码可复现发行版，也没有绕过后声称 UIKit 验收通过。既有 UIKit 作业仍保留。不会自动发布 Release。
 - 跟随新版官方升级时，需重新审查源码基线、官方 IPA 地址/校验值和头文件，不能只改版本号。
 
-本地验证：111 项 Node 测试中 105 通过、6 按环境跳过、0 失败；另有 6 项 Python 归档安全/核心边界测试全部通过。独立云端 App 构建待执行。
+本地验证：111 项 Node 测试中 105 通过、6 按环境跳过、0 失败；另有 8 项 Python 归档安全/核心边界及打包防覆盖测试全部通过。独立云端 App 构建记录见 RC9-VALIDATION.json。
+
+Xcode 16.4 构建兼容：设置/关于页显式引用上层目录的主题策略头文件；临时项目对 DOBootstrapper.m 增加 `-fno-builtin-strrchr`，保留上游原 libc 调用，避免优化后引入 SDK 中无法链接的 `_memrchr`。不改动该文件或版本比较逻辑。
+
+成功构建：`https://github.com/kulinichx/DopamineGlass/actions/runs/44094121720`，产物 `DopamineGlass-official-core-TEST-5`。包含 `.ipa`、同内容的 `.tipa`、`BUILD-REPORT.json` 和测试包说明。编译、签名身份检查及所有 48 个底层文件的最终归档 SHA-256 校验全部通过。
+
+按用户后续要求，独立 App 打包流程现移除内置 `zebra.deb`，并从最终 `PkgManagers.plist` 中仅移除 `xyz.willy.Zebra` 对应条目，保留 Sileo 原条目和安装包。所有 46 个其余保护文件继续逐字节校验；原始 Zebra 包和配置也先按输入哈希核验，并在报告中单列删改结果。不会卸载设备上已有的 Zebra。原源码、底层模块与依赖锁定未改；未来全源码路线如恢复，需同步采用这项已授权的资源裁剪。产物仍按用户要求保留 IPA/TIPA 两种后缀。

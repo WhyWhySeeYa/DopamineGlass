@@ -66,17 +66,26 @@ class PackageIntegrityTests(unittest.TestCase):
         built = pathlib.Path(directory) / 'built'
         official.mkdir(parents=True)
         built.mkdir()
-        data = {'libchoma.dylib': b'official-choma', 'Frameworks/kfd.framework/kfd': b'official-kfd'}
+        data = {'libchoma.dylib': b'official-choma', 'Frameworks/kfd.framework/kfd': b'official-kfd', 'sileo.deb': b'official-sileo'}
         for name, contents in data.items():
             p = official / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(contents)
+        managers = [
+            {'Display Name': 'Sileo', 'Key': 'org.coolstar.SileoStore', 'Package': 'sileo.deb', 'Icon': 'Sileo'},
+            {'Display Name': 'Zebra', 'Key': 'xyz.willy.Zebra', 'Package': 'zebra.deb', 'Icon': 'Zebra'},
+        ]
+        (official / 'PkgManagers.plist').write_bytes(plistlib.dumps(managers))
+        (official / 'zebra.deb').write_bytes(b'official-zebra')
+        (built / 'zebra.deb').write_bytes(b'reintroduced-by-build')
+        (built / 'PkgManagers.plist').write_bytes(plistlib.dumps(managers))
         (official / 'Dopamine').write_bytes(b'original-executable')
         (built / 'Dopamine').write_bytes(b'rebuilt-executable')
         (built / 'libchoma.dylib').write_bytes(b'MUST-NOT-REPLACE-OFFICIAL')
         (built / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'cn.zqbb.dopaRH'}))
         (built / 'Themes.plist').write_bytes(plistlib.dumps({'custom_glass': {}}))
         provenance = {'sourceCommit': 'a' * 40, 'preservedCore': {name: hashlib.sha256(contents).hexdigest() for name, contents in data.items()}}
+        provenance['packageCustomizationInputs'] = {name: build.sha256(official / name) for name in build.PACKAGE_CUSTOMIZATION_INPUTS}
         build.write_json(work / 'input-provenance.json', provenance)
         return work, official, built
 
@@ -100,9 +109,30 @@ class PackageIntegrityTests(unittest.TestCase):
             with zipfile.ZipFile(ipa) as z:
                 self.assertEqual(z.read(build.PREFIX + 'libchoma.dylib'), b'official-choma')
                 self.assertEqual(z.read(build.PREFIX + 'Dopamine'), b'rebuilt-executable-SIGNED')
+                self.assertNotIn(build.PREFIX + 'zebra.deb', z.namelist())
+                self.assertEqual(z.read(build.PREFIX + 'sileo.deb'), b'official-sileo')
+                managers = plistlib.loads(z.read(build.PREFIX + 'PkgManagers.plist'))
+                self.assertEqual(managers, plistlib.loads((official / 'PkgManagers.plist').read_bytes())[:1])
             report = json.loads((out / 'BUILD-REPORT.json').read_text())
             self.assertTrue(report['coreIntegrity'].startswith('PASS'))
             self.assertEqual(report['outputSHA256'], build.sha256(ipa))
+            self.assertEqual(report['packageCustomizationResult']['removed'], ['zebra.deb'])
+            self.assertEqual(report['packageCustomizationResult']['remainingPackageManagers'], managers)
+
+    def test_removal_rejects_unexpected_manager_changes(self):
+        with tempfile.TemporaryDirectory() as t:
+            work, official, built = self.fixture(t)
+            original = plistlib.loads((official / 'PkgManagers.plist').read_bytes())
+            for invalid in (original[:1], original[1:], original + [{'Key': 'other', 'Package': 'other.deb'}]):
+                with self.subTest(managers=invalid), self.assertRaises(ValueError):
+                    build.sileo_only_configuration(plistlib.dumps(invalid))
+
+    def test_customization_source_tamper_is_rejected(self):
+        with tempfile.TemporaryDirectory() as t:
+            work, official, built = self.fixture(t)
+            (official / 'PkgManagers.plist').write_bytes(plistlib.dumps([]))
+            with self.assertRaisesRegex(ValueError, 'Original core changed'):
+                build.package(work, built, pathlib.Path(t) / 'output')
 
     def test_modified_official_input_is_rejected(self):
         with tempfile.TemporaryDirectory() as t:

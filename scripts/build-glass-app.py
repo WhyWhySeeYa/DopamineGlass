@@ -17,6 +17,8 @@ OFFICIAL_URL = 'https://github.com/w2599/Dopamine/releases/download/3.0.13/' + O
 OFFICIAL_SHA256 = 'cb90db40fdc085ba1f8e6c56a6bb3220d902497fa66a860b66b2a24fced52394'
 PREFIX = 'Payload/Dopamine.app/'
 HEADER_PINS = json.loads((ROOT / 'scripts/glass-header-pins.json').read_text(encoding='utf-8'))
+# User-requested package-only change. All other protected files remain byte-for-byte official.
+PACKAGE_CUSTOMIZATION_INPUTS = ('zebra.deb', 'PkgManagers.plist')
 
 def sha256(file):
     with open(file, 'rb') as stream:
@@ -75,6 +77,16 @@ def protected(relative):
     return (relative.startswith('Frameworks/') or relative.endswith(('.dylib', '.deb', '.tar.zst'))
             or relative in ('basebin.tar', 'basebin.tc', 'PkgManagers.plist', 'Dopamine.roothide'))
 
+def sileo_only_configuration(data):
+    managers = plistlib.loads(data)
+    if not isinstance(managers, list) or not all(isinstance(m, dict) for m in managers):
+        raise ValueError('Unexpected package manager configuration')
+    zebra = [m for m in managers if m.get('Key') == 'xyz.willy.Zebra' and m.get('Package') == 'zebra.deb']
+    remaining = [m for m in managers if m not in zebra]
+    if len(zebra) != 1 or len(remaining) != 1 or remaining[0].get('Key') != 'org.coolstar.SileoStore' or remaining[0].get('Package') != 'sileo.deb':
+        raise ValueError('Expected exactly original Zebra and Sileo; refuse broader package changes')
+    return remaining
+
 def write_json(file, data):
     Path(file).write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 
@@ -107,10 +119,13 @@ def prepare(work, ipa=None, downloads=None):
             shutil.rmtree(include / 'xpc')
     source_app = work / 'official' / PREFIX
     preserved = {p.relative_to(source_app).as_posix(): sha256(p) for p in source_app.rglob('*')
-                 if p.is_file() and protected(p.relative_to(source_app).as_posix())}
-    for name in ('libjailbreak.dylib', 'libchoma.dylib', 'libxpf.dylib', 'libroothider.dylib', 'basebin.tar', 'basebin.tc'):
+                 if p.is_file() and protected(p.relative_to(source_app).as_posix())
+                 and p.relative_to(source_app).as_posix() not in PACKAGE_CUSTOMIZATION_INPUTS}
+    for name in ('libjailbreak.dylib', 'libchoma.dylib', 'libxpf.dylib', 'libroothider.dylib', 'basebin.tar', 'basebin.tc', 'sileo.deb'):
         if name not in preserved:
             raise ValueError('Missing required original core: ' + name)
+    customization_inputs = {name: sha256(source_app / name) for name in PACKAGE_CUSTOMIZATION_INPUTS}
+    sileo_only_configuration((source_app / 'PkgManagers.plist').read_bytes())
     write_json(work / 'input-provenance.json', {
         'buildMode': 'App source + pinned official prebuilt core; TEST CANDIDATE',
         'officialURL': OFFICIAL_URL, 'officialSHA256': OFFICIAL_SHA256,
@@ -119,6 +134,8 @@ def prepare(work, ipa=None, downloads=None):
         'headerCaveat': 'ChOma 7dccded declarations only, not the unavailable 4e4f884 source. No ChOma code is rebuilt. Runtime ABI/device testing remains required.',
         'zstdFrontendRevision': 'f8745da6ff1ad1e7bab384bd1f9d742439278e99',
         'preservedCore': preserved,
+        'packageCustomizationInputs': customization_inputs,
+        'packageCustomization': 'User requested removal of bundled zebra.deb and only its PkgManagers.plist entry; retain Sileo unchanged',
         'fullSourceBuild': False, 'deviceValidation': 'NOT RUN',
         'uikitRuntime': 'NOT VERIFIED: separate simulator job timed out during installation',
     })
@@ -128,7 +145,7 @@ def package(work, built, out):
     work, built, out = Path(work), Path(built), Path(out)
     provenance = json.loads((work / 'input-provenance.json').read_text(encoding='utf-8'))
     official = work / 'official' / PREFIX
-    for file, digest in provenance['preservedCore'].items():
+    for file, digest in {**provenance['preservedCore'], **provenance['packageCustomizationInputs']}.items():
         if sha256(official / file) != digest:
             raise ValueError('Original core changed during build: ' + file)
     # Original IPA is the base: new App code and compiled UI assets overlay it, never the protected core.
@@ -143,6 +160,15 @@ def package(work, built, out):
         target = final / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(p, target)
+    expected_managers = sileo_only_configuration((official / 'PkgManagers.plist').read_bytes())
+    (final / 'zebra.deb').unlink()
+    (final / 'PkgManagers.plist').write_bytes(plistlib.dumps(expected_managers))
+    provenance['packageCustomizationResult'] = {
+        'removed': ['zebra.deb'],
+        'removedBytes': (official / 'zebra.deb').stat().st_size,
+        'PkgManagersSHA256': sha256(final / 'PkgManagers.plist'),
+        'remainingPackageManagers': expected_managers,
+    }
     seal = final / '_CodeSignature'
     if seal.exists():
         shutil.rmtree(seal)
@@ -174,22 +200,27 @@ def package(work, built, out):
     with zipfile.ZipFile(ipa) as archive:
         list(checked_entries(archive))
         actual_protected = {n[len(PREFIX):] for n in archive.namelist() if n.startswith(PREFIX) and protected(n[len(PREFIX):])}
-        if actual_protected != set(provenance['preservedCore']):
+        if actual_protected != set(provenance['preservedCore']) | {'PkgManagers.plist'}:
             raise ValueError('Core file set changed')
         for file, digest in provenance['preservedCore'].items():
             if hashlib.sha256(archive.read(PREFIX + file)).hexdigest() != digest:
                 raise ValueError('Final IPA core mismatch: ' + file)
+        if any(PurePosixPath(n).name == 'zebra.deb' for n in archive.namelist()):
+            raise ValueError('Zebra package was reintroduced')
+        if plistlib.loads(archive.read(PREFIX + 'PkgManagers.plist')) != expected_managers:
+            raise ValueError('Package manager list differs from the authorized Zebra-only removal')
         themes = plistlib.loads(archive.read(PREFIX + 'Themes.plist'))
         if 'custom_glass' not in str(themes):
             raise ValueError('Glass theme missing from package')
     shutil.copy2(ipa, out / (stem + '.tipa'))
     provenance['outputSHA256'] = sha256(ipa)
-    provenance['coreIntegrity'] = 'PASS: exact original core file set and SHA256 for every preserved file'
+    provenance['coreIntegrity'] = 'PASS: exact original file set and SHA256 for every preserved file; only declared Zebra package removal and manager entry filter differ'
     write_json(out / 'BUILD-REPORT.json', provenance)
     (out / 'READ-ME-FIRST.txt').write_text(
         'TEST CANDIDATE / 待真机验收\nApp 源码重新编译，底层来自固定 SHA256 的 ZQBB 官方 3.0.13-30 IPA。\n'
         '不是全源码重建，不是已完成真机验收的发行版。UIKit 模拟器运行校验尚未通过。\n'
         '未授权默认原版 UI；有效授权并选中 custom_glass 才启用玻璃。\n'
+        '按用户要求移除内置 Zebra 安装包及选择入口，保留 Sileo；不卸载设备已有的 Zebra。\n'
         '请先备份现有安装和越狱环境。不要直接作为已验证稳定版分发。\n', encoding='utf-8')
     print('Packaged and verified:', ipa, provenance['outputSHA256'])
 

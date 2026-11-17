@@ -1,6 +1,6 @@
 {
   "date": "2026-11-17",
-  "timezone": "America/Denver",
+  "timezone": "Asia/Shanghai",
   "host": "Windows",
   "node": "v24.21.0",
   "sourceTests": {
@@ -29,8 +29,11 @@
     "duplicateLocaleKeys": "none in en, zh-CN, zh-Hans"
   },
   "nativeBuild": {
-    "status": "failed before App compilation",
-    "reason": "GitHub push run 44076126835 recursive checkout failed: exact ChOma pin 4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6 not our ref; no IPA/TIPA produced"
+    "status": "SUCCESS for App-source + official prebuilt core candidate",
+    "run": 44094121720,
+    "sourceCommit": "a96f416",
+    "scope": "Current App compiled with Xcode 16.4/iPhoneOS18.5 arm64; core is pinned official IPA, not rebuilt from missing source",
+    "fullSourceRoute": "Still blocked at unavailable exact ChOma gitlink; unchanged"
   },
   "deviceValidation": {
     "status": "not run"
@@ -44,7 +47,7 @@
     "homeRefresh": "Rebuild when home is visible; no window replacement during expanded jailbreak or on top of a presented license alert."
   },
   "workflow": {
-    "status": "uploaded and dispatched; macOS regression passed; UIKit execution blocked by hosted simulator install timeout; no Release published"
+    "status": "Cloud App candidate built successfully and uploaded to Actions artifacts; UIKit runtime incomplete; no Release published"
   },
   "dependencyPins": {
     "status": "unchanged",
@@ -92,17 +95,50 @@
     "latestDispatchRun": 44080329731
   },
   "prebuiltCoreCandidate": {
-    "status": "prepared locally; cloud compilation pending",
+    "status": "SUCCESS: App compilation, linking, ldid signing, package identity, archive creation and 48-file official-core integrity verification passed",
     "workflow": ".github/workflows/glass-app-build.yml",
     "officialSHA256": "cb90db40fdc085ba1f8e6c56a6bb3220d902497fa66a860b66b2a24fced52394",
     "preservedCoreFiles": 48,
     "archiveSafetyTests": {
-      "tests": 6,
-      "pass": 6,
+      "tests": 8,
+      "pass": 8,
       "fail": 0
     },
     "fullSourceBuild": false,
     "deviceValidation": "not run",
-    "declarationCaveat": "ChOma public 7dccded headers only; original released dylib retained. ABI needs device verification."
+    "declarationCaveat": "ChOma public 7dccded headers only; original released dylib retained. ABI needs device verification.",
+    "buildFixes": [
+      "Settings/Credits import the theme policy header via its explicit relative path",
+      "Disposable App project disables builtin strrchr optimization for DOBootstrapper.m only; upstream source remains unchanged"
+    ],
+    "latestBuildRun": 44094121720,
+    "sourceCommit": "a96f416",
+    "artifact": "DopamineGlass-official-core-TEST-5",
+    "artifactZIPBytes": 72833181,
+    "artifactZIPSHA256": "3326d0077558fa880f10b8418257b9896d706c4cc1fc5841003fe370b1533a67"
+  },
+  "zebraRemoval": {
+    "status": "implemented and locally tested; cloud candidate pending",
+    "scope": "package only: remove zebra.deb and exactly Zebra manager entry, keep Sileo unchanged; do not uninstall device apps",
+    "preservedOfficialFiles": 46,
+    "customizationInputFiles": [
+      "zebra.deb",
+      "PkgManagers.plist"
+    ],
+    "pythonTests": {
+      "tests": 10,
+      "pass": 10,
+      "fail": 0
+    },
+    "nodeTests": {
+      "tests": 111,
+      "pass": 105,
+      "skipped": 6,
+      "fail": 0
+    },
+    "installerFormats": [
+      "ipa",
+      "tipa"
+    ]
   }
 }
