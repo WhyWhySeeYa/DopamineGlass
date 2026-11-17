@@ -57,7 +57,7 @@ node scripts/verify-rc9-port.cjs
 node scripts/export-rc9-patches.cjs
 ```
 
-模拟器验证入口另加入 13 组主题选择/授权组合与撤销后恢复材质检查；Foundation 入口执行生产主题解析方法，覆盖无偏好、无效偏好、普通主题、玻璃主题与撤销后重新授权。本机尚未执行这些原生入口。
+模拟器验证入口另加入 13 组主题选择/授权组合与撤销后恢复材质检查；Foundation 入口执行生产主题解析方法，覆盖无偏好、无效偏好、普通主题、玻璃主题与撤销后重新授权。本机未执行这些原生入口；云端 Foundation 入口现已通过，UIKit 入口已通过原生编译但尚未完成模拟器运行。
 
 macOS 可另外运行模拟器测试（不是 Windows 上的源码检查）：
 
@@ -66,7 +66,7 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
   node --test --test-name-pattern='UIKit simulator exercises' tests/glass-ui-contracts.test.cjs
 ```
 
-工作流 `../.github/workflows/main.yml` 已修正为检出当前仓库，而不是硬编码下载另一份官方仓库。`port-tests` 可独立运行 macOS 回归，不需要下载底层子模块；手动执行工作流时还要求 `uikit-layout` 通过，再进入完整构建。用户确认后已推送至 `kulinichx/DopamineGlass` 的 `rc9-glass-authorization` 分支，并启动 Actions；没有发布 Release。初次 macOS 回归 108 项中 107 通过、0 失败、1 项 UIKit 按入口跳过。单独 UIKit 作业在 CoreSimulator 冷启动枚举时超过原 60 秒上限，尚未进入界面编译；已添加有界冷启动等待后重跑。详见 `RC9-VALIDATION.json`。
+工作流 `../.github/workflows/main.yml` 已修正为检出当前仓库，而不是硬编码下载另一份官方仓库。`port-tests` 可独立运行 macOS 回归，不需要下载底层子模块；手动执行工作流时还要求 `uikit-layout` 通过，再进入完整构建。用户确认后已推送至 `kulinichx/DopamineGlass` 的 `rc9-glass-authorization` 分支，并启动 Actions；没有发布 Release。初次 macOS 回归 108 项中 107 通过、0 失败、1 项 UIKit 按入口跳过。单独 UIKit 作业在调整冷启动等待后，已通过 Xcode 16.4 / iOS Simulator 18.5 原生编译；随后首次启动数据迁移超过原 180 秒上限，尚未进入界面断言。已增加有界首次启动等待后重跑；不能把编译通过当作布局测试通过。详见 `RC9-VALIDATION.json`。
 
 ## 当前构建限制
 

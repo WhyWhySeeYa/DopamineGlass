@@ -80,7 +80,13 @@
       "skipped": 1
     },
     "foundation": "passed production media transaction, blur scheduling and theme/authorization selection tests",
-    "uikit": "initial simctl runtime enumeration timed out at 60 seconds before compilation; bounded 240-second cold-start allowance added; retry pending",
-    "fullBuild": "initial push run failed at recursive checkout: locked ChOma commit not our ref; no IPA/TIPA produced"
+    "uikit": "Run 44078794467: production UIKit harness compiled with Xcode 16.4/iOS Simulator 18.5 x86_64; bootstatus exceeded 180 seconds in first-boot data migration before app launch; bounded 420-second boot retry pending.",
+    "fullBuild": "initial push run failed at recursive checkout: locked ChOma commit not our ref; no IPA/TIPA produced",
+    "nativeUIKitCompilation": {
+      "status": "passed",
+      "run": 44078794467,
+      "scope": "production material and layout snippets with synthetic Preferences parent; not full App build"
+    },
+    "runner": "macos-15-intel for Foundation/UIKit jobs; full build keeps upstream runner"
   }
 }
