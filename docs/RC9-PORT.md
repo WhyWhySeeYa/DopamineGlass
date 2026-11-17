@@ -86,3 +86,16 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
 6. 真机至少覆盖：未授权仍可使用原越狱；合法旧/新授权、错误设备/无效码、撤销失败；头像/静态和动态壁纸；前后台、重新加载、重启；原 ZQBB 主题、备用图标、设置、包管理器和原支持范围。
 
 源码已按用户请求提交并推送至其 GitHub 仓库以执行构建。没有发布安装包或设置自动升级；后续构建记录须继续区分源码回归、原生 UIKit 验证和完整 App 打包结果。
+
+## 独立 App / 官方预编译底层构建路线
+
+新增手动工作流 `.github/workflows/glass-app-build.yml`，不替代原来的全源码工作流。固定取 ZQBB 官方 `Dopamine_roothide_zqbb_3.0.13-30_20261106_103030.ipa`，SHA-256 为 `cb90db40fdc085ba1f8e6c56a6bb3220d902497fa66a860b66b2a24fced52394`（已核对官方 Release asset digest 和本地文件）。
+
+- 当前 App 源码重新编译，临时项目禁用底层 target；原项目、BaseBin 和 gitlink 不改。
+- 最终包以该官方 IPA 为底稿，保留所有 Frameworks、dylib、deb、bootstrap、basebin 和 PkgManagers.plist；打包后核对全部 48 个底层文件及 SHA-256。
+- XPF 头文件使用原 gitlink 的精确提交。ChOma 缺失提交不能恢复，因此仅用公开 `7dccded` 的头文件声明编译，不编译或替换 ChOma 库；每个头文件单独固定 SHA-256。声明与官方二进制的 ABI 兼容性仍需真机验证。
+- App 的 zstd 显式锁定 v1.5.7 提交 `f8745da6ff1ad1e7bab384bd1f9d742439278e99`，不追随原 dev 分支漂移；仅改变临时项目的包解析。
+- 产物仅为 TEST CANDIDATE，不是全源码可复现发行版，也没有绕过后声称 UIKit 验收通过。既有 UIKit 作业仍保留。不会自动发布 Release。
+- 跟随新版官方升级时，需重新审查源码基线、官方 IPA 地址/校验值和头文件，不能只改版本号。
+
+本地验证：111 项 Node 测试中 105 通过、6 按环境跳过、0 失败；另有 6 项 Python 归档安全/核心边界测试全部通过。独立云端 App 构建待执行。

@@ -3,6 +3,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const tests = [
   'tests/upstream-port-contracts.test.cjs',
+  'tests/glass-app-build.test.cjs',
   'tests/glass-ui-contracts.test.cjs',
   'tests/supporter-license-contracts.test.cjs',
   'tests/supporter-binding.test.cjs',

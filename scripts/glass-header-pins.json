@@ -1,0 +1,104 @@
+[
+  {
+    "name": "choma",
+    "repository": "opa334/ChOma",
+    "commit": "7dccded6bc17081c08f5f5cdbd7a4b051543a825",
+    "headers": [
+      {
+        "path": "src/Base64.h",
+        "sha256": "c7cdd1b1e76b754195502ea3871ed4c10f9a44be4af1b26105a48408e63f97aa"
+      },
+      {
+        "path": "src/BufferedStream.h",
+        "sha256": "59bfbdc1f76c0f049e3c3527681f1424bff3f709f7dd01dd2e03fb9f4abb2ba6"
+      },
+      {
+        "path": "src/CSBlob.h",
+        "sha256": "a3dfc032275b630a003e73586e22cbb2e86591c23823bd37390856d5e447ea76"
+      },
+      {
+        "path": "src/CachePatching.h",
+        "sha256": "d992b984b2a613a852c72dad9b108a7b6003066f5cac3dfd69d20b9f84d082fe"
+      },
+      {
+        "path": "src/CodeDirectory.h",
+        "sha256": "19b2eedf78f3ad5d611d12e935610c535442c7ec1bdbedcb07c03bfbaf7d340f"
+      },
+      {
+        "path": "src/DER.h",
+        "sha256": "d15e275ea01b42e193443d4d311280e625ff57f6042bb72757f8b4a3bd0d964c"
+      },
+      {
+        "path": "src/DyldSharedCache.h",
+        "sha256": "a6e76ed6e9d9089ad6b62aaf471ed8a7153edb5c858473f8ec1c79e98e06baa5"
+      },
+      {
+        "path": "src/Entitlements.h",
+        "sha256": "b0c4a6736c62d49f26e4273aec7589d2acae9d0b42bc43f7b6ff60c92dc57d09"
+      },
+      {
+        "path": "src/Fat.h",
+        "sha256": "eaf5d79a84e062501b9ccdbfd905601964b933efdd294c9b690bc30b43d918b6"
+      },
+      {
+        "path": "src/FileStream.h",
+        "sha256": "bdc94847c7081239eb781eea72793abf0dfb3bc1f2db85931a2031f0bcf89f61"
+      },
+      {
+        "path": "src/Host.h",
+        "sha256": "1b2f1a144227ff396cda24d213cfea47b3f1abdde2ba9b6623be4af23a77627f"
+      },
+      {
+        "path": "src/MachO.h",
+        "sha256": "611f919d9e4010cde29038df56427aca093dd7a8fcdbb788c2b7fb94dbd84f5d"
+      },
+      {
+        "path": "src/MachOByteOrder.h",
+        "sha256": "e982bd184ff8e14c82e8344f68cdfe3377568644a38019010e66958d80beea6d"
+      },
+      {
+        "path": "src/MachOLoadCommand.h",
+        "sha256": "82a6bd7a78c706894bf1b64722b6775ff75442cd9aa34012c502415c3e2c7561"
+      },
+      {
+        "path": "src/MemoryStream.h",
+        "sha256": "db3090952552c954a78c022b8cfe064d47f3931776ebc3667e3196c54e7d5fcf"
+      },
+      {
+        "path": "src/PatchFinder.h",
+        "sha256": "bb4d83385b463942abdf7f842583f6c0d17adae56e657b7e1a56389be1a5fcea"
+      },
+      {
+        "path": "src/PatchFinder_arm64.h",
+        "sha256": "66d1a33b1a65b4392cd8b4debddc85260199df13f86de432d728541cb47c7362"
+      },
+      {
+        "path": "src/Util.h",
+        "sha256": "425361a1ff01d3f54dfa95b3a22163290c0511e9ea3efd8e9efa2a71e9f3dc24"
+      },
+      {
+        "path": "src/arm64.h",
+        "sha256": "c9cde9dbb26f587b1b73ce8841dffd5f280623e049e26295e5974fa3f16c37c6"
+      },
+      {
+        "path": "src/dyld_cache_format.h",
+        "sha256": "679ca731ff5da6e61c6e0a32dda47d92bada286e29587e8ad0d3102b320427f9"
+      },
+      {
+        "path": "src/fixup-chains.h",
+        "sha256": "17db8c0939e96cbba9f0f4078340101b7ca49b8b6aafae34c9fe981b36791021"
+      }
+    ]
+  },
+  {
+    "name": "xpf",
+    "repository": "opa334/XPF",
+    "commit": "9e12b8faa7444f6fe7f699aec6b6c96d151455d3",
+    "headers": [
+      {
+        "path": "src/xpf.h",
+        "sha256": "c55d041fd4b8cbea785e6fb9d03dbc0ad420484d5bfd219e686b0024aa726e64"
+      }
+    ]
+  }
+]

@@ -28,3 +28,6 @@ Exploits/kfd/kfd.framework/kfd
 # Generated local verification evidence (not release sources).
 /verification/
 /.audit-artifacts/
+
+# Python build/test bytecode.
+__pycache__/

@@ -1,0 +1,71 @@
+name: Glass App + verified official core (test candidate)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: glass-app-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  candidate:
+    runs-on: macos-15-intel
+    timeout-minutes: 40
+    env:
+      WORK: ${{ github.workspace }}/verification/prebuilt-core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
+      - name: Source regression and upstream boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verification
+          node scripts/run-rc9-tests.cjs | tee verification/source-tests.log
+          node scripts/verify-rc9-port.cjs | tee verification/upstream-boundaries.json
+          python3 tests/glass-app-archive.test.py
+      - name: Install executable signer
+        run: brew install ldid
+      - name: Prepare immutable official core and declaration-only headers
+        run: |
+          python3 scripts/build-glass-app.py prepare --work "$WORK"
+          node scripts/prepare-glass-app-project.cjs "$WORK"
+      - name: Compile current App only (no BaseBin or exploit targets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -project "$WORK/GlassApp.xcodeproj" -scheme Dopamine \
+            -configuration Release -derivedDataPath "$WORK/derived" \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            2>&1 | tee verification/glass-app-xcodebuild.log
+      - name: Package and verify every original core file
+        run: |
+          python3 scripts/build-glass-app.py package --work "$WORK" \
+            --built "$WORK/derived/Build/Products/Release-iphoneos/Dopamine.app" \
+            --out verification/output
+      - name: Test-candidate installer (not a verified release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: DopamineGlass-official-core-TEST-${{ github.run_number }}
+          path: verification/output/*
+          if-no-files-found: error
+      - name: Build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glass-app-diagnostics-${{ github.run_id }}
+          path: |
+            verification/*.log
+            verification/*.json
+            verification/prebuilt-core/input-provenance.json
+            verification/prebuilt-core/app-*.json
+            verification/prebuilt-core/GlassApp.xcodeproj/project.pbxproj
+          if-no-files-found: warn

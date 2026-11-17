@@ -5,11 +5,11 @@
   "node": "v24.21.0",
   "sourceTests": {
     "exitCode": 0,
-    "tests": 108,
-    "pass": 102,
+    "tests": 111,
+    "pass": 105,
     "fail": 0,
     "skipped": 6,
-    "log": "verification/rc9-port-tests.tap (local evidence, ignored by Git)"
+    "log": "verification/local-app-build-tests.log"
   },
   "upstreamContracts": {
     "result": "passed",
@@ -90,5 +90,19 @@
     "runner": "macos-15-intel for Foundation/UIKit jobs; full build keeps upstream runner",
     "latestSourceCommit": "8cc3532",
     "latestDispatchRun": 44080329731
+  },
+  "prebuiltCoreCandidate": {
+    "status": "prepared locally; cloud compilation pending",
+    "workflow": ".github/workflows/glass-app-build.yml",
+    "officialSHA256": "cb90db40fdc085ba1f8e6c56a6bb3220d902497fa66a860b66b2a24fced52394",
+    "preservedCoreFiles": 48,
+    "archiveSafetyTests": {
+      "tests": 6,
+      "pass": 6,
+      "fail": 0
+    },
+    "fullSourceBuild": false,
+    "deviceValidation": "not run",
+    "declarationCaveat": "ChOma public 7dccded headers only; original released dylib retained. ABI needs device verification."
   }
 }
