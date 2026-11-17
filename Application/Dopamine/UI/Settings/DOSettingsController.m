@@ -21,7 +21,7 @@
 #import "DOPSJetsamListItemsController.h"
 #import "DOButtonCell.h"
 #import "DOCustomGlassView.h"
-#import "DOThemePresentation.h"
+#import "../DOThemePresentation.h"
 #import "../DOSupporterLicenseUI.h"
 
 @interface DOSettingsController ()

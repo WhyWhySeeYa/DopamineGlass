@@ -10,7 +10,7 @@
 #import "DOUIManager.h"
 #import "DOEnvironmentManager.h"
 #import "DOCustomGlassView.h"
-#import "DOThemePresentation.h"
+#import "../DOThemePresentation.h"
 #import <Preferences/PSSpecifier.h>
 
 @interface DOCreditsViewController ()
