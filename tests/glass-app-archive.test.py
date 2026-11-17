@@ -2,6 +2,10 @@ import importlib.util
 import io
 import pathlib
 import tempfile
+import json
+import hashlib
+import plistlib
+from unittest import mock
 import unittest
 import zipfile
 spec = importlib.util.spec_from_file_location('glass_build', pathlib.Path(__file__).resolve().parents[1] / 'scripts/build-glass-app.py')
@@ -54,6 +58,58 @@ class ArchiveIntegrityTests(unittest.TestCase):
             p.write_bytes(b'not the official release')
             with self.assertRaisesRegex(ValueError, 'digest mismatch'):
                 build.fetch('https://invalid.example', p, build.OFFICIAL_SHA256)
+
+class PackageIntegrityTests(unittest.TestCase):
+    def fixture(self, directory):
+        work = pathlib.Path(directory) / 'work'
+        official = work / 'official' / build.PREFIX
+        built = pathlib.Path(directory) / 'built'
+        official.mkdir(parents=True)
+        built.mkdir()
+        data = {'libchoma.dylib': b'official-choma', 'Frameworks/kfd.framework/kfd': b'official-kfd'}
+        for name, contents in data.items():
+            p = official / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(contents)
+        (official / 'Dopamine').write_bytes(b'original-executable')
+        (built / 'Dopamine').write_bytes(b'rebuilt-executable')
+        (built / 'libchoma.dylib').write_bytes(b'MUST-NOT-REPLACE-OFFICIAL')
+        (built / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'cn.zqbb.dopaRH'}))
+        (built / 'Themes.plist').write_bytes(plistlib.dumps({'custom_glass': {}}))
+        provenance = {'sourceCommit': 'a' * 40, 'preservedCore': {name: hashlib.sha256(contents).hexdigest() for name, contents in data.items()}}
+        build.write_json(work / 'input-provenance.json', provenance)
+        return work, official, built
+
+    def test_packaged_core_cannot_be_overwritten_by_build(self):
+        with tempfile.TemporaryDirectory() as t:
+            work, official, built = self.fixture(t)
+            out = pathlib.Path(t) / 'output'
+            entitlements = (build.ROOT / 'Application/Dopamine/Dopamine.entitlements').read_bytes()
+            actual_run = build.subprocess.run
+            def sign_or_verify(args, **kwargs):
+                if args[0] == 'ldid':
+                    executable = pathlib.Path(args[-1])
+                    executable.write_bytes(executable.read_bytes() + b'-SIGNED')
+                    return build.subprocess.CompletedProcess(args, 0)
+                return actual_run(args, **kwargs)
+            with mock.patch.object(build.subprocess, 'run', side_effect=sign_or_verify), mock.patch.object(build.subprocess, 'check_output', return_value=entitlements):
+                build.package(work, built, out)
+            ipa = next(out.glob('*.ipa'))
+            tipa = next(out.glob('*.tipa'))
+            self.assertEqual(ipa.read_bytes(), tipa.read_bytes())
+            with zipfile.ZipFile(ipa) as z:
+                self.assertEqual(z.read(build.PREFIX + 'libchoma.dylib'), b'official-choma')
+                self.assertEqual(z.read(build.PREFIX + 'Dopamine'), b'rebuilt-executable-SIGNED')
+            report = json.loads((out / 'BUILD-REPORT.json').read_text())
+            self.assertTrue(report['coreIntegrity'].startswith('PASS'))
+            self.assertEqual(report['outputSHA256'], build.sha256(ipa))
+
+    def test_modified_official_input_is_rejected(self):
+        with tempfile.TemporaryDirectory() as t:
+            work, official, built = self.fixture(t)
+            (official / 'libchoma.dylib').write_bytes(b'tampered')
+            with self.assertRaisesRegex(ValueError, 'Original core changed'):
+                build.package(work, built, pathlib.Path(t) / 'output')
 
 if __name__ == '__main__':
     unittest.main()

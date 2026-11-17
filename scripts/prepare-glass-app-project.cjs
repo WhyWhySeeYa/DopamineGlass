@@ -19,6 +19,14 @@ function prepare(root, work) {
   main.targets = [targetID];
   main.projectDirPath = appRoot.replaceAll('\\','/');
   target.dependencies = [];
+  // Xcode associates productReference with every native target object, even outside project.targets.
+  // Drop obsolete target objects/proxies so linked frameworks are ordinary prebuilt file references.
+  for (const [id, o] of Object.entries(objects)) {
+    if ((o.isa === 'PBXNativeTarget' && id !== targetID) ||
+        o.isa === 'PBXTargetDependency' || o.isa === 'PBXContainerItemProxy') delete objects[id];
+  }
+  if (main.attributes?.TargetAttributes)
+    main.attributes.TargetAttributes = {[targetID]: main.attributes.TargetAttributes[targetID] || {}};
   // Preserve all App source/resource entries; remove core copy phases, assembled from original IPA later.
   target.buildPhases = target.buildPhases.filter(id => objects[id].isa !== 'PBXCopyFilesBuildPhase');
   const usedRefs = new Set(target.buildPhases.flatMap(id => objects[id].files || []).map(id => objects[id].fileRef).filter(Boolean));
@@ -34,6 +42,7 @@ function prepare(root, work) {
         const file = path.join(official, basename.endsWith('.framework') ? 'Frameworks' : '', basename);
         if (!fs.existsSync(file)) throw new Error('Official package missing build input: '+file);
         object.path = file.replaceAll('\\','/'); object.sourceTree = '<absolute>';
+        if (object.explicitFileType) { object.lastKnownFileType=object.explicitFileType; delete object.explicitFileType; }
       }
     }
     if(object.isa==='XCRemoteSwiftPackageReference' && object.repositoryURL==='https://github.com/facebook/zstd.git')
