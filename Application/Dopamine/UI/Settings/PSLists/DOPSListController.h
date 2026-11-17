@@ -16,6 +16,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (void)setupViewControllerStyle:(UIViewController*)vc;
 
+// Full-screen pages keep Preferences' table geometry and reserve their chrome
+// with content insets instead of resizing the table after its own layout pass.
+- (BOOL)preferencesUsesNativeTableLayout;
+
 @end
 
 NS_ASSUME_NONNULL_END

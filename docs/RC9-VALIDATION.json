@@ -1,0 +1,70 @@
+{
+  "date": "2026-11-17",
+  "timezone": "America/Denver",
+  "host": "Windows",
+  "node": "v24.21.0",
+  "sourceTests": {
+    "exitCode": 0,
+    "tests": 108,
+    "pass": 102,
+    "fail": 0,
+    "skipped": 6,
+    "log": "verification/rc9-port-tests.tap (local evidence, ignored by Git)"
+  },
+  "upstreamContracts": {
+    "result": "passed",
+    "count": 13
+  },
+  "plistParsing": {
+    "result": "passed",
+    "parser": "Python standard library plistlib",
+    "files": [
+      "Application/Dopamine/UI/Themes/Themes.plist",
+      "Application/Dopamine/Dopamine.entitlements",
+      "Application/Dopamine/UI/Settings/Credits.plist",
+      "Application/Dopamine/Info.plist"
+    ],
+    "themes": 6,
+    "originalThemesRetained": 5,
+    "duplicateLocaleKeys": "none in en, zh-CN, zh-Hans"
+  },
+  "nativeBuild": {
+    "status": "not run",
+    "reason": "Windows host; exact upstream ChOma pin unavailable"
+  },
+  "deviceValidation": {
+    "status": "not run"
+  },
+  "authorizationBoundary": {
+    "scope": "RC9 glass theme and its custom appearance/profile/wallpaper features only",
+    "unauthorizedTheme": "Dopamine default theme; custom_glass is excluded from theme selection and stale glass preference is normalized to default",
+    "unauthorizedRendering": "Actual baseline stock home, Settings and Credits paths; no RC9 profile/cards are constructed. Opaque material is only an intermediate revocation safeguard.",
+    "standaloneJailbreakAndMaintenance": "available independently of glass authorization",
+    "defaultOnFreshInstall": "default for all installations; valid license plus explicit custom_glass selection required",
+    "homeRefresh": "Rebuild when home is visible; no window replacement during expanded jailbreak or on top of a presented license alert."
+  },
+  "workflow": {
+    "status": "configured, not dispatched; YAML inspected but actionlint unavailable locally"
+  },
+  "dependencyPins": {
+    "status": "unchanged",
+    "choma": "4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6 unavailable at configured remote; left uninitialized"
+  },
+  "patchSeries": {
+    "status": "Sequential apply --cached --check and apply with --whitespace=error-all; resulting Git tree compared with reviewed working tree",
+    "directory": "../rc9-port-patches",
+    "patches": [
+      "0001-glass-and-authorization-components.patch",
+      "0002-zqbb-ui-integration.patch",
+      "0003-supporter-maintenance-tools.patch",
+      "0004-regression-ci-and-upgrade-docs.patch"
+    ],
+    "actualGitIndex": "not modified",
+    "actualGitObjects": "not modified; isolated temporary object directory"
+  },
+  "nativeAuthorizationChecks": {
+    "status": "configured, not run on Windows",
+    "foundation": "production theme selection with mocked license validity",
+    "uikit": "13 authorization/selection and revocation/restoration checks; synthetic Preferences parent"
+  }
+}

@@ -828,6 +828,13 @@
 				8C58E5592B7EAF8000E3ADAA /* CoreServices.framework in Frameworks */,
 				8CF3E8672F72DD9400931CA8 /* DarkSword.framework in Frameworks */,
 				8C4ABEB62B52094100B43C9B /* libjailbreak.dylib in Frameworks */,
+
+				A91611040000000000000010 /* AVFoundation.framework in Frameworks */,
+				A91611040000000000000012 /* Photos.framework in Frameworks */,
+				A91611040000000000000014 /* PhotosUI.framework in Frameworks */,
+				A91611040000000000000016 /* CoreImage.framework in Frameworks */,
+				A91611040000000000000018 /* QuartzCore.framework in Frameworks */,
+				64CC288955786A5EE3176661 /* Security.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -876,6 +883,15 @@
 				042479872B66916B0082581B /* DOHeaderView.m */,
 				042479832B66916B0082581B /* DOGlobalAppearance.h */,
 				042479A02B66916B0082581B /* DOGlobalAppearance.m */,
+
+				A91611040000000000000002 /* DOCustomGlassView.m */,
+				A91611040000000000000003 /* DOCustomGlassView.h */,
+				A91611040000000000000004 /* DOCustomGlassMediaStore.h */,
+				A91611040000000000000005 /* DOCustomGlassThemeSync.h */,
+				F8F7CC73A1A5D19951C5BCD6 /* DOSupporterBinding.h */,
+				B634EDB4EF940C73769C886F /* DOSupporterLicense.h */,
+				4C97D00455E5BC89D56496CD /* DOSupporterLicenseUI.h */,
+				6BE1C603145C5BCBC66F6045 /* DOSupporterRenderAuthorization.h */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -1116,6 +1132,13 @@
 				8C029F652B4E2E7D0071DE58 /* libcompression.tbd */,
 				8CDD083B2B4F6D8200A32B61 /* libgrabkernel2.a */,
 				8C029F6A2B4E320E0071DE58 /* libz.tbd */,
+
+				A91611040000000000000011 /* AVFoundation.framework */,
+				A91611040000000000000013 /* Photos.framework */,
+				A91611040000000000000015 /* PhotosUI.framework */,
+				A91611040000000000000017 /* CoreImage.framework */,
+				A91611040000000000000019 /* QuartzCore.framework */,
+				04B2EC7F0BC116608984C314 /* Security.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -2329,6 +2352,8 @@
 				042479B62B66916B0082581B /* DOActionMenuButton.m in Sources */,
 				8C71981D2ABF0E82003C6658 /* DOSceneDelegate.m in Sources */,
 				042479A32B66916B0082581B /* DOSettingsController.m in Sources */,
+
+				A91611040000000000000001 /* DOCustomGlassView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3094,7 +3119,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Dopamine/Info.plist;
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Dopamine needs to access your photo library to support picking a boot logo";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Dopamine uses selected photos and videos for wallpapers, avatars and boot logos.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -3132,7 +3157,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Dopamine/Info.plist;
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Dopamine needs to access your photo library to support picking a boot logo";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Dopamine uses selected photos and videos for wallpapers, avatars and boot logos.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -3420,6 +3445,29 @@
 			productName = libzstd;
 		};
 /* End XCSwiftPackageProductDependency section */
+
+/* RC9 glass and offline authorization: additive project objects. */
+		A91611040000000000000001 /* DOCustomGlassView.m in Sources */ = {isa = PBXBuildFile; fileRef = A91611040000000000000002 /* DOCustomGlassView.m */; };
+		A91611040000000000000010 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000011 /* AVFoundation.framework */; };
+		A91611040000000000000012 /* Photos.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000013 /* Photos.framework */; };
+		A91611040000000000000014 /* PhotosUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000015 /* PhotosUI.framework */; };
+		A91611040000000000000016 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000017 /* CoreImage.framework */; };
+		A91611040000000000000018 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000019 /* QuartzCore.framework */; };
+		A91611040000000000000002 /* DOCustomGlassView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOCustomGlassView.m; sourceTree = "<group>"; };
+		A91611040000000000000003 /* DOCustomGlassView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOCustomGlassView.h; sourceTree = "<group>"; };
+		A91611040000000000000004 /* DOCustomGlassMediaStore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOCustomGlassMediaStore.h; sourceTree = "<group>"; };
+		A91611040000000000000005 /* DOCustomGlassThemeSync.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOCustomGlassThemeSync.h; sourceTree = "<group>"; };
+		A91611040000000000000011 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		A91611040000000000000013 /* Photos.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Photos.framework; path = System/Library/Frameworks/Photos.framework; sourceTree = SDKROOT; };
+		A91611040000000000000015 /* PhotosUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PhotosUI.framework; path = System/Library/Frameworks/PhotosUI.framework; sourceTree = SDKROOT; };
+		A91611040000000000000017 /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
+		A91611040000000000000019 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		F8F7CC73A1A5D19951C5BCD6 /* DOSupporterBinding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOSupporterBinding.h; sourceTree = "<group>"; };
+		B634EDB4EF940C73769C886F /* DOSupporterLicense.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOSupporterLicense.h; sourceTree = "<group>"; };
+		4C97D00455E5BC89D56496CD /* DOSupporterLicenseUI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOSupporterLicenseUI.h; sourceTree = "<group>"; };
+		6BE1C603145C5BCBC66F6045 /* DOSupporterRenderAuthorization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOSupporterRenderAuthorization.h; sourceTree = "<group>"; };
+		04B2EC7F0BC116608984C314 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		64CC288955786A5EE3176661 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04B2EC7F0BC116608984C314 /* Security.framework */; };
 	};
 	rootObject = 8C71980D2ABF0E82003C6658 /* Project object */;
 }

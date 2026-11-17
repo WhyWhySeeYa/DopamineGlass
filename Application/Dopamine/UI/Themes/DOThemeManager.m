@@ -7,6 +7,10 @@
 
 #import "DOThemeManager.h"
 #import "DOPreferenceManager.h"
+#import "DOSupporterLicense.h"
+
+static NSString * const DOCustomGlassThemeKey = @"custom_glass";
+static NSString * const DODefaultThemeKey = @"default";
 
 @implementation DOThemeManager
 
@@ -41,7 +45,10 @@
 - (NSArray*)getAvailableThemeKeys
 {
     NSMutableArray *keys = [[NSMutableArray alloc] init];
+    BOOL supporterVerified = DORHSupporterIsVerified();
     for (DOTheme *theme in _themes) {
+        if ([theme.key isEqualToString:DOCustomGlassThemeKey] && !supporterVerified)
+            continue;
         [keys addObject:theme.key];
     }
     return keys;
@@ -50,7 +57,10 @@
 - (NSArray*)getAvailableThemeNames
 {
     NSMutableArray *names = [[NSMutableArray alloc] init];
+    BOOL supporterVerified = DORHSupporterIsVerified();
     for (DOTheme *theme in _themes) {
+        if ([theme.key isEqualToString:DOCustomGlassThemeKey] && !supporterVerified)
+            continue;
         [names addObject:theme.name];
     }
     return names;
@@ -68,10 +78,23 @@
 
 - (DOTheme*)enabledTheme
 {
-    id value = [[DOPreferenceManager sharedManager] preferenceValueForKey:@"theme"];
-    if (!value)
-        return self.themes.firstObject;
-    return [self getThemeForKey:value] ?: self.themes.firstObject;
+    DOPreferenceManager *preferences = [DOPreferenceManager sharedManager];
+    BOOL supporterVerified = DORHSupporterIsVerified();
+    id value = [preferences preferenceValueForKey:@"theme"];
+
+    if (![value isKindOfClass:NSString.class])
+        value = DODefaultThemeKey;
+
+    if ([value isEqualToString:DOCustomGlassThemeKey] && !supporterVerified) {
+        value = DODefaultThemeKey;
+        [preferences setPreferenceValue:value forKey:@"theme"];
+    }
+
+    DOTheme *theme = [self getThemeForKey:value];
+    if (theme)
+        return theme;
+
+    return [self getThemeForKey:DODefaultThemeKey] ?: self.themes.firstObject;
 }
 
 

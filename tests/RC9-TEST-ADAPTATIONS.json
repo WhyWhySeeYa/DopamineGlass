@@ -1,0 +1,36 @@
+{
+  "sourceCommit": "f6295a208781974b09227eeab9723dc180329f71",
+  "reason": "ZQBB full-feature baseline, not the RC9 iOS16-only fork; no live issuer GUI or real issuer key is used.",
+  "excludedGlass": [
+    "homepage action wiring preserves the baseline except for the removed A8-only notice",
+    "mount tasks spawn in the existing privilege scope and wait outside it with reentry protection",
+    "native Foundation mount task waits outside privilege scopes and reports spawn, busy and child failures",
+    "only the purple fallback theme and primary icon remain",
+    "primary app icon files match the RC9 source snapshot",
+    "stale theme selection falls back safely and the old settings picker is gone",
+    "iOS 16 slimming preserves settings data sources and action/preference implementations",
+    "Credits has no builder attribution and the build verifies the packaged menu"
+  ],
+  "excludedBinding": [
+    "migration UI passes review digests, clears failed previews and distinguishes clipboard failure from issuance failure",
+    "Windows migration preview smoke test uses empty temporary databases and never opens an issuer key",
+    "Windows migration tool remembers only a validated directory across launches and safely handles stale or corrupt settings",
+    "Windows dark migration grid displays original users separately from notes, devices and issued dates",
+    "Windows VBS launcher displays an actual visible main window and propagates smoke-test failures",
+    "mount addition matches ZQBB save-before-mount and never deletes a reused copy on failure",
+    "mount removal persists the list before cleanup and guards both shared-tree directions",
+    "native Foundation mount removal preserves copies on save failure and keeps legacy overlapping entries editable",
+    "native Foundation executes the production mount-copy routine without mounts and preserves A_tmp"
+  ],
+  "changedAssertions": [
+    "License gates apply to glass editing, not ZQBB jailbreak entry",
+    "Upstream environment spawn behavior checked byte-for-byte instead of requiring RC9 process changes",
+    "Project may explicitly list supporter headers for IDE discovery; material headers remain license-neutral",
+    "System injection mode is read from unchanged upstream localized getter",
+    "RC9 restart-status adapter is changed to upstream void action signatures; no engine API changes or invented result codes",
+    "Stock home restored by an included baseline-derived implementation; glass-only assertions are scoped to the glass builder.",
+    "Native table/full-screen styles are conditional on a licensed, explicitly selected glass theme; ordinary pages retain upstream framing.",
+    "Navigation does not subscribe to slider theme notifications; license changes may publish them to invalidate visible materials without reloading media on each slider update."
+  ],
+  "nativeTests": "macOS-only harnesses remain explicit skips on Windows"
+}

@@ -7,6 +7,8 @@
 
 #import <UIKit/UIKit.h>
 #import "DOAppDelegate.h"
+#import "UI/DOCustomGlassThemeSync.h"
+#import "UI/DOCustomGlassMediaStore.h"
 #import <libroothider/log.h>
 
 #import "DOEnvironmentManager.h"
@@ -53,6 +55,8 @@ if(@available(iOS 17.0.1, *)) {
     
     NSString * appDelegateClassName;
     @autoreleasepool {
+        DOCustomGlassThemeSyncBootstrap();
+        DOCustomGlassMediaStoreScheduleOrphanCleanup();
         // Setup code that might create autoreleased objects goes here.
         appDelegateClassName = NSStringFromClass([DOAppDelegate class]);
     }

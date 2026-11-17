@@ -20,8 +20,16 @@
 #import "DOSceneDelegate.h"
 #import "DOPSJetsamListItemsController.h"
 #import "DOButtonCell.h"
+#import "DOCustomGlassView.h"
+#import "DOThemePresentation.h"
+#import "../DOSupporterLicenseUI.h"
 
 @interface DOSettingsController ()
+
+@property(nonatomic) BOOL customGlassPageEnabled;
+
+@property(nonatomic, strong) NSMutableDictionary<NSNumber *, DOCustomLiquidGlassView *> *customGlassSectionBackdrops;
+@property(nonatomic, strong) UIButton *customGlassBackButton;
 
 @end
 
@@ -30,7 +38,222 @@
 - (void)viewDidLoad
 {
     _lastKnownTheme = [[DOThemeManager sharedInstance] enabledTheme].key;
+    self.customGlassPageEnabled = DOUsesCustomGlassTheme();
     [super viewDidLoad];
+    if (!self.customGlassPageEnabled)
+        return;
+
+    self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    self.view.backgroundColor = UIColor.clearColor;
+    self.view.layer.cornerRadius = 0.0;
+    self.view.layer.masksToBounds = NO;
+    _table.backgroundColor = UIColor.clearColor;
+    _table.opaque = NO;
+    UIView *glassBackground = [[UIView alloc] initWithFrame:CGRectZero];
+    glassBackground.backgroundColor = UIColor.clearColor;
+    glassBackground.userInteractionEnabled = NO;
+    _table.backgroundView = glassBackground;
+    _table.separatorStyle = UITableViewCellSeparatorStyleNone;
+    _table.layer.cornerRadius = 0.0;
+    _table.layer.borderWidth = 0.0;
+    _table.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    // Preferences supplies exact row/header heights; estimates can move the
+    // scroll offset as offscreen groups enter the viewport.
+    _table.estimatedRowHeight = 0.0;
+    _table.estimatedSectionHeaderHeight = 0.0;
+    _table.estimatedSectionFooterHeight = 0.0;
+    self.customGlassSectionBackdrops = [NSMutableDictionary dictionary];
+
+    // Navigation must work independently of appearance or future authorization.
+    UIButton *backButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    backButton.translatesAutoresizingMaskIntoConstraints = NO;
+    backButton.tintColor = UIColor.whiteColor;
+    backButton.accessibilityLabel = DOLocalizedString(@"Button_Back");
+    UIImageSymbolConfiguration *configuration =
+        [UIImageSymbolConfiguration configurationWithPointSize:22.0 weight:UIImageSymbolWeightMedium];
+    [backButton setImage:[UIImage systemImageNamed:@"chevron.left" withConfiguration:configuration]
+               forState:UIControlStateNormal];
+    [backButton addTarget:self action:@selector(customGlassBackPressed)
+        forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:backButton];
+    self.customGlassBackButton = backButton;
+    [NSLayoutConstraint activateConstraints:@[
+        [backButton.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:10.0],
+        [backButton.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:6.0],
+        [backButton.widthAnchor constraintEqualToConstant:44.0],
+        [backButton.heightAnchor constraintEqualToConstant:44.0]
+    ]];
+
+    UIScreenEdgePanGestureRecognizer *edgeGesture =
+        [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(customGlassEdgeBackGesture:)];
+    edgeGesture.edges = UIRectEdgeLeft;
+    [self.view addGestureRecognizer:edgeGesture];
+    [_table.panGestureRecognizer requireGestureRecognizerToFail:edgeGesture];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(customGlassThemeDidChange:)
+                                                 name:DOCustomGlassThemeDidChangeNotification
+                                               object:nil];
+}
+
+- (void)customGlassBackPressed
+{
+    if (self.navigationController.topViewController == self)
+        [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (void)customGlassEdgeBackGesture:(UIScreenEdgePanGestureRecognizer *)gesture
+{
+    if (gesture.state != UIGestureRecognizerStateEnded)
+        return;
+    CGPoint translation = [gesture translationInView:self.view];
+    CGPoint velocity = [gesture velocityInView:self.view];
+    if (translation.x > 60.0 && velocity.x >= 0.0)
+        [self customGlassBackPressed];
+}
+
+- (void)customGlassStyleContent:(UIView *)view header:(BOOL)isHeader
+{
+    if (!self.customGlassPageEnabled)
+        return;
+    // Keep Preferences controls intact; the section owns the only glass frame.
+    if ([view isKindOfClass:UISwitch.class] ||
+        [view isKindOfClass:UISlider.class] ||
+        [view isKindOfClass:UISegmentedControl.class] ||
+        [view isKindOfClass:UITextField.class] ||
+        [view isKindOfClass:UITextView.class])
+        return;
+
+    if (isHeader)
+        view.backgroundColor = UIColor.clearColor;
+
+    if ([view isKindOfClass:UILabel.class]) {
+        UILabel *label = (UILabel *)view;
+        label.textColor = [UIColor.labelColor colorWithAlphaComponent:(isHeader ? 0.74 : 0.96)];
+        label.shadowColor = [UIColor colorWithWhite:0.0 alpha:0.14];
+        label.shadowOffset = CGSizeMake(0.0, 0.35);
+    }
+    else if ([view isKindOfClass:UIButton.class]) {
+        UIButton *button = (UIButton *)view;
+        button.backgroundColor = UIColor.clearColor;
+        button.layer.borderWidth = 0.0;
+        button.layer.shadowOpacity = 0.0;
+        button.tintColor = UIColor.whiteColor;
+        if (button.configuration) {
+            UIButtonConfiguration *configuration = [button.configuration copy];
+            configuration.baseForegroundColor = UIColor.whiteColor;
+            button.configuration = configuration;
+        }
+        [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    }
+    else if ([view isKindOfClass:UIImageView.class]) {
+        UIImageView *imageView = (UIImageView *)view;
+        if (imageView.image.renderingMode == UIImageRenderingModeAlwaysTemplate)
+            imageView.tintColor = UIColor.whiteColor;
+    }
+
+    for (UIView *subview in view.subviews) {
+        // Only remove simple header rules, never control or image content.
+        BOOL hairline = isHeader && subview.class == UIView.class &&
+            CGRectGetHeight(subview.bounds) > 0.0 &&
+            CGRectGetHeight(subview.bounds) <= 2.0 &&
+            CGRectGetWidth(subview.bounds) >= 40.0;
+        if (hairline)
+            subview.hidden = YES;
+        [self customGlassStyleContent:subview header:isHeader];
+    }
+}
+
+- (void)customGlassStyleCell:(UITableViewCell *)cell
+{
+    if (!self.customGlassPageEnabled)
+        return;
+    cell.backgroundColor = UIColor.clearColor;
+    cell.contentView.backgroundColor = UIColor.clearColor;
+    cell.backgroundView = nil;
+    cell.layer.borderWidth = 0.0;
+    cell.contentView.layer.borderWidth = 0.0;
+    BOOL isHeader = [cell isKindOfClass:DOHeaderCell.class];
+    if (isHeader) {
+        cell.selectedBackgroundView = nil;
+    }
+    else {
+        UIView *selected = cell.selectedBackgroundView ?: [[UIView alloc] initWithFrame:CGRectZero];
+        selected.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.05];
+        cell.selectedBackgroundView = selected;
+    }
+    [self customGlassStyleContent:cell.contentView header:isHeader];
+}
+
+- (void)customGlassRefreshSectionBackdrops
+{
+    if (!self.customGlassPageEnabled)
+        return;
+    UIView *background = _table.backgroundView;
+    if (!background)
+        return;
+    NSMutableSet<NSNumber *> *activeSections = [NSMutableSet set];
+    for (NSInteger section = 0; section < _table.numberOfSections; section++) {
+        NSInteger rows = [_table numberOfRowsInSection:section];
+        if (rows == 0)
+            continue;
+        CGRect firstRect = [_table rectForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:section]];
+        CGRect lastRect = [_table rectForRowAtIndexPath:[NSIndexPath indexPathForRow:rows - 1 inSection:section]];
+        CGRect rect = CGRectUnion(firstRect, lastRect);
+        if (CGRectIsEmpty(rect))
+            continue;
+        NSNumber *key = @(section);
+        [activeSections addObject:key];
+        DOCustomLiquidGlassView *glass = self.customGlassSectionBackdrops[key];
+        if (!glass) {
+            glass = [[DOCustomLiquidGlassView alloc] initWithCornerRadius:18.0 baseTintAlpha:0.038];
+            glass.materialScale = 0.88;
+            glass.userInteractionEnabled = NO;
+            self.customGlassSectionBackdrops[key] = glass;
+            [background addSubview:glass];
+            [glass reloadMaterial];
+        }
+        CGRect frame = [_table convertRect:CGRectInset(rect, 1.0, 0.5) toView:background];
+        if (!CGRectEqualToRect(glass.frame, frame))
+            glass.frame = frame;
+    }
+    for (NSNumber *key in self.customGlassSectionBackdrops.allKeys) {
+        if (![activeSections containsObject:key]) {
+            [self.customGlassSectionBackdrops[key] removeFromSuperview];
+            [self.customGlassSectionBackdrops removeObjectForKey:key];
+        }
+    }
+}
+
+- (void)customGlassRefreshPageAppearance
+{
+    if (!self.customGlassPageEnabled)
+        return;
+    [self customGlassRefreshSectionBackdrops];
+    for (UITableViewCell *cell in _table.visibleCells)
+        [self customGlassStyleCell:cell];
+    for (NSInteger section = 0; section < _table.numberOfSections; section++) {
+        UIView *header = [_table headerViewForSection:section];
+        UIView *footer = [_table footerViewForSection:section];
+        [self customGlassStyleContent:header header:YES];
+        [self customGlassStyleContent:footer header:YES];
+    }
+    if (self.customGlassBackButton)
+        [self.view bringSubviewToFront:self.customGlassBackButton];
+}
+
+- (void)customGlassThemeDidChange:(NSNotification *)notification
+{
+    if (!NSThread.isMainThread) {
+        __weak typeof(self) weakSelf = self;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf customGlassThemeDidChange:notification];
+        });
+        return;
+    }
+    for (DOCustomLiquidGlassView *glass in self.customGlassSectionBackdrops.allValues)
+        [glass reloadMaterial];
+    [self customGlassRefreshPageAppearance];
 }
 
 - (void)viewWillAppear:(BOOL)arg1
@@ -51,7 +274,62 @@
             });
         }
     }
+    [self.view setNeedsLayout];
+    [self customGlassThemeDidChange:nil];
 }
+
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    // Scrolling lays out the table repeatedly. Restyling button configurations
+    // here invalidates layout again; style only on display or theme changes.
+    [self customGlassRefreshSectionBackdrops];
+}
+
+- (BOOL)preferencesUsesNativeTableLayout
+{
+    return self.customGlassPageEnabled;
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView
+{
+    [super scrollViewDidScroll:scrollView];
+    if (scrollView == _table)
+        [self customGlassRefreshSectionBackdrops];
+}
+
+- (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    [super tableView:tableView willDisplayCell:cell forRowAtIndexPath:indexPath];
+    [self customGlassStyleCell:cell];
+    __weak typeof(self) weakSelf = self;
+    __weak UITableViewCell *weakCell = cell;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UITableViewCell *visibleCell = weakCell;
+        if (visibleCell.window && [tableView indexPathForCell:visibleCell])
+            [weakSelf customGlassStyleCell:visibleCell];
+        [weakSelf customGlassRefreshSectionBackdrops];
+    });
+}
+
+- (void)tableView:(UITableView *)tableView willDisplayHeaderView:(UIView *)view forSection:(NSInteger)section
+{
+    [self customGlassStyleContent:view header:YES];
+}
+
+- (void)tableView:(UITableView *)tableView willDisplayFooterView:(UIView *)view forSection:(NSInteger)section
+{
+    [self customGlassStyleContent:view header:YES];
+}
+
+- (void)dealloc
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:DOCustomGlassThemeDidChangeNotification
+                                                  object:nil];
+}
+
+
 
 - (NSArray *)availableKernelExploitIdentifiers
 {
@@ -382,6 +660,14 @@
             }
         }
         
+        PSSpecifier *supporterSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+        [supporterSpecifier setProperty:@"Supporter_Title" forKey:@"title"];
+        [supporterSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+        [supporterSpecifier setProperty:buttonHeight forKey:@"height"];
+        [supporterSpecifier setProperty:@"checkmark.seal" forKey:@"image"];
+        [supporterSpecifier setProperty:@"supporterLicensePressed" forKey:@"action"];
+        [specifiers addObject:supporterSpecifier];
+
         PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
         themingGroupSpecifier.name = DOLocalizedString(@"Section_Customization");
         [specifiers addObject:themingGroupSpecifier];
@@ -735,6 +1021,11 @@
 - (void)refreshJailbreakAppsPressed
 {
     [[DOEnvironmentManager sharedManager] refreshJailbreakApps];
+}
+
+- (void)supporterLicensePressed
+{
+    DORHPresentSupporterLicense(self);
 }
 
 - (void)reinstallPackageManagersPressed

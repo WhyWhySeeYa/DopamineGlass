@@ -17,19 +17,24 @@
         [titleLabel setText:[specifier propertyForKey:@"title"]];
         [titleLabel setFont:[UIFont systemFontOfSize:17 weight:UIFontWeightMedium]];
         [titleLabel setTextColor:[UIColor whiteColor]];
+        titleLabel.textAlignment = NSTextAlignmentCenter;
+        titleLabel.adjustsFontSizeToFitWidth = YES;
+        titleLabel.minimumScaleFactor = 0.65;
         titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         
-        [self.contentView addSubview:titleLabel];
+        // Preferences installs this as a section header, not as a table row.
+        [self addSubview:titleLabel];
 
         [NSLayoutConstraint activateConstraints:@[
             [titleLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor constant:-3],
-            [titleLabel.centerXAnchor constraintEqualToAnchor:self.centerXAnchor]
+            [titleLabel.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:20],
+            [titleLabel.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-20]
         ]];
 
         UIView *border = [[UIView alloc] init];
         border.translatesAutoresizingMaskIntoConstraints = NO;
         border.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.1];
-        [self.contentView addSubview:border];
+        [self addSubview:border];
 
         [NSLayoutConstraint activateConstraints:@[
             [border.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:20],

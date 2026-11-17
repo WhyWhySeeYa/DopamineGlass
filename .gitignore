@@ -20,4 +20,11 @@ Tools/fastPathSign/.build_*
 Exploits/kfd/kfd.framework/kfd
 .sign
 /worker
-/docs
+/docs/*
+!/docs/rc9-port-manifest.json
+!/docs/RC9-PORT.md
+!/docs/RC9-VALIDATION.json
+
+# Generated local verification evidence (not release sources).
+/verification/
+/.audit-artifacts/

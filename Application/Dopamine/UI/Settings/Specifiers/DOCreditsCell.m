@@ -7,6 +7,7 @@
 
 #import "DOCreditsCell.h"
 #import "DOGlobalAppearance.h"
+#import <math.h>
 
 #define CREDITS_CELL_HEIGHT 35
 
@@ -82,6 +83,7 @@
 @interface DOCreditsCell ()
 @property (nonatomic, strong) NSArray<NSDictionary*> *names;
 @property (nonatomic, strong) UICollectionView *collectionView;
+@property (nonatomic, assign) CGFloat lastCollectionWidth;
 @end
 
 @implementation DOCreditsCell
@@ -103,22 +105,34 @@
         self.collectionView.backgroundColor = [UIColor clearColor];
         self.collectionView.showsVerticalScrollIndicator = NO;
         self.collectionView.showsHorizontalScrollIndicator = NO;
+        self.collectionView.scrollEnabled = NO;
 
         [self.collectionView registerClass:[DOCreditsCellItem class] forCellWithReuseIdentifier:@"item"];
         self.collectionView.delegate = self;
         self.collectionView.dataSource = self;
         
-        [self.contentView addSubview:self.collectionView];
+        // A section header must not inherit UITableViewCell's row content insets.
+        [self addSubview:self.collectionView];
 
         [NSLayoutConstraint activateConstraints:@[
             [self.collectionView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:20],
             [self.collectionView.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-20],
-            [self.collectionView.topAnchor constraintEqualToAnchor:self.topAnchor constant:0],
-            [self.collectionView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-0],
+            [self.collectionView.topAnchor constraintEqualToAnchor:self.topAnchor],
+            [self.collectionView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
         ]];
         
     }
     return self;
+}
+
+- (void)layoutSubviews
+{
+    [super layoutSubviews];
+    CGFloat width = CGRectGetWidth(self.collectionView.bounds);
+    if (fabs(width - self.lastCollectionWidth) > 0.5) {
+        self.lastCollectionWidth = width;
+        [self.collectionView.collectionViewLayout invalidateLayout];
+    }
 }
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section

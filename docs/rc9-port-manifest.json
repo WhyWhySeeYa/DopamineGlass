@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/w2599/Dopamine.git",
+    "ref": "3.x_roothide_AI_review_fix",
+    "commit": "3ac500e9d95553c2ffd651894315d79b31ee8aed",
+    "version": "3.0.13",
+    "rootHideAncestor": "9617d75f476423fdfd33477299c8a1349eb6f375",
+    "binaryProvenance": "The public source candidate has not been proven to match the released IPA byte-for-byte."
+  },
+  "rc9": {
+    "commit": "f6295a208781974b09227eeab9723dc180329f71",
+    "importedAt": "2026-11-17",
+    "unchangedRuntimeFiles": {
+      "Application/Dopamine/UI/DOCustomGlassMediaStore.h": "c8b3c36074502153e7d0919bc6d4df43e941218f7a27eba4795e1ee7f39e79bc",
+      "Application/Dopamine/UI/DOCustomGlassThemeSync.h": "2fd14c17cbc326b90f64033af7faf065f964223940abea346d28fa10291c3657",
+      "Application/Dopamine/UI/DOCustomGlassView.h": "dc2169ba87404ce212422d4dd65298798443fc721a24d9c856f5474c22ae19e8",
+      "Application/Dopamine/UI/DOSupporterBinding.h": "24f96a7e617d6b0f9024cd2c04311d3a2944d93033399e4527fec5801b03ffa6",
+      "Application/Dopamine/UI/DOSupporterLicense.h": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
+      "Application/Dopamine/UI/DOSupporterLicenseUI.h": "0c88f214d7ac30e9356f7ecb96cfbf99ec7db46660a9f82c062913af9d776d85",
+      "Application/Dopamine/UI/DOSupporterRenderAuthorization.h": "520c79ee9dd132f552284447cea98740d7ac2f1593e90038cc63b86e9acaee12"
+    },
+    "runtimeAdaptations": {
+      "Application/Dopamine/UI/DOCustomGlassView.m": {
+        "sourceSha256": "3b10886527061f217b0ab015274309680c0de662b80732865ef2637c90a37108",
+        "adaptedSha256": "26bb43f61c59f35c930c9e92c375accbb9f87d516e5bea1d2571be276d1e0885",
+        "reason": "Render glass only for an authorized, explicitly selected custom_glass theme; otherwise use the upstream stock UI path."
+      }
+    }
+  },
+  "contract": {
+    "bundleIdentifier": "cn.zqbb.dopaRH",
+    "themeKey": "custom_glass",
+    "authorizationScope": "Custom Glass only; preserve upstream jailbreak access",
+    "protectedPaths": [
+      "BaseBin",
+      "Standalone",
+      "Packages",
+      "Application/Dopamine/Exploits",
+      "Application/Dopamine/Jailbreak",
+      "Application/Dopamine/Resources",
+      "Application/Dopamine/UI/PkgManagers",
+      "Application/Dopamine/Assets.xcassets",
+      "Application/Dopamine/UI/Settings/DOLicenseViewController.m",
+      "Application/Dopamine/UI/Settings/Credits.plist",
+      "Application/Dopamine/UI/Settings/DOSettingsController.h",
+      ".gitmodules",
+      "Makefile",
+      "Application/Makefile",
+      "mybuild.sh"
+    ]
+  },
+  "validation": {
+    "sourceTests": "passed locally; see RC9-VALIDATION.json for exact counts",
+    "macOSBuild": "not run; Windows host and unavailable upstream ChOma pin",
+    "deviceValidation": "not run"
+  },
+  "dependencies": {
+    "unavailable": {
+      "path": "BaseBin/ChOma",
+      "commit": "4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6",
+      "remote": "https://github.com/opa334/ChOma",
+      "error": "not our ref",
+      "action": "left uninitialized; gitlink and dependency versions not changed"
+    },
+    "nestedXPFDependencies": "not fully initialized"
+  }
+}

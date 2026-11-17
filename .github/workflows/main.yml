@@ -19,6 +19,8 @@ concurrency:
 
 jobs:
   build:
+    needs: [uikit-layout, port-tests]
+    if: always() && needs.port-tests.result == 'success' && (needs.uikit-layout.result == 'success' || needs.uikit-layout.result == 'skipped')
     runs-on: macos-latest
     steps:
       - name: Xcode Setup
@@ -29,8 +31,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
         with:
-            repository: roothide/Dopamine-roothide
+            fetch-depth: 0
             submodules: recursive
+
+      - name: Set up Node for RC9 port checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Install Procursus
         uses: dhinakg/procursus-action@main
@@ -95,6 +102,21 @@ jobs:
           mv "./Application/Dopamine-roothide-${APP_VERSION}.tipa" "./Application/roothide-Dopamine-${VERSION}.tipa"
           echo "version=${VERSION}" >> $GITHUB_ENV
 
+      - name: Verify packaged RC9 identity and keychain scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          tipa="$(find Application -maxdepth 1 -type f -name 'roothide-Dopamine-*.tipa' -print -quit)"
+          test -n "$tipa"
+          unzip -p "$tipa" Payload/Dopamine.app/Dopamine > "$RUNNER_TEMP/RootHide-Dopamine"
+          unzip -p "$tipa" Payload/Dopamine.app/Info.plist > "$RUNNER_TEMP/RootHide-Info.plist"
+          unzip -p "$tipa" Payload/Dopamine.app/Themes.plist > "$RUNNER_TEMP/RootHide-Themes.plist"
+          ldid -e "$RUNNER_TEMP/RootHide-Dopamine" > app-entitlements.plist
+          plutil -convert json -o app-entitlements.json app-entitlements.plist
+          plutil -convert json -o app-info.json "$RUNNER_TEMP/RootHide-Info.plist"
+          plutil -lint "$RUNNER_TEMP/RootHide-Themes.plist"
+          node scripts/verify-app-entitlements.cjs app-entitlements.json app-info.json
+
       - name: Upload Artifact
         id: dopamine-latest-upload
         uses: actions/upload-artifact@main
@@ -111,3 +133,44 @@ jobs:
           path: |
             ${{ github.workspace }}/Application/roothide-Dopamine-${{ env.version }}.tipa
           archive: false
+
+  port-tests:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify glass, authorization and upstream boundaries
+        run: node scripts/run-rc9-tests.cjs
+
+  uikit-layout:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify UIKit table geometry and layering
+        env:
+          DORH_RUN_UIKIT_SIMULATOR: '1'
+          DORH_SIMULATOR_RUNTIME: '18.5'
+        run: node --test --test-name-pattern='UIKit simulator exercises' tests/glass-ui-contracts.test.cjs
+      - name: Upload UIKit layout evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UIKit_layout_evidence
+          path: .audit-artifacts/preferences-ui/
+          if-no-files-found: ignore

@@ -90,5 +90,15 @@
 		<key>titleShadow</key>
 		<false/>
 	</dict>
+	<!-- Additive RC9 theme; keep every ZQBB theme and alternate icon. -->
+	<dict>
+		<key>key</key><string>custom_glass</string>
+		<key>name</key><string>Custom Glass</string>
+		<key>image</key><string>Background_Purple.jpg</string>
+		<key>actionMenuColor</key><string>4F150C71</string>
+		<key>windowColor</key><string>6008040A</string>
+		<key>blur</key><integer>35</integer>
+		<key>titleShadow</key><false/>
+	</dict>
 </array>
 </plist>

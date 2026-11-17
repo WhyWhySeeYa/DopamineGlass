@@ -1,0 +1,531 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const crypto = require('node:crypto');
+const test = require('node:test');
+const { execFileSync } = require('node:child_process');
+const binding = require('../scripts/supporter-binding.cjs');
+
+const root = path.resolve(__dirname, '..');
+const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
+const app = read('Application/Dopamine/UI/DOSupporterBinding.h');
+const licenseSource = read('Application/Dopamine/UI/DOSupporterLicense.h');
+const device = '0123-4567-89AB-CDEF-0123-4567-89AB-CDEF';
+const issuer = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+const deviceKey = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+const jwk = deviceKey.publicKey.export({ format: 'jwk' });
+const point = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x, 'base64url'), Buffer.from(jwk.y, 'base64url')]);
+const hardwareHash = binding.sha256('test-hardware-only');
+
+function signedWire(prefix, info, key = issuer.privateKey, domain = Buffer.alloc(0)) {
+  const payload = Buffer.from(JSON.stringify(info));
+  const signature = crypto.sign('sha256', Buffer.concat([domain, payload]), key);
+  return `${prefix}.${payload.toString('base64url')}.${signature.toString('base64url')}`;
+}
+
+function fixture() {
+  const license = signedWire('RH1', { v: 1, product: 'DopamineRH', sid: '0027', device, ent: ['custom_glass'] });
+  const proof = { DeviceCode: device, HardwareHash: hardwareHash,
+    KeyFingerprint: binding.sha256(point), PublicKey: point.toString('base64url') };
+  const records = [{ SupporterId: '0027', DeviceCode: device, License: license }];
+  const row = binding.plan(records, [proof], issuer.publicKey).rows[0];
+  return { license, proof, records, row };
+}
+
+function body(source, name) {
+  const signature = new RegExp(`(?:static inline|static) [^{;]+\\b${name}\\([^;]*?\\)\\s*\\{`, 'm');
+  const match = signature.exec(source);
+  assert.ok(match, name);
+  let depth = 1;
+  for (let i = match.index + match[0].length; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    if (source[i] === '}' && --depth === 0) return source.slice(match.index, i + 1);
+  }
+  assert.fail(`Unclosed ${name}`);
+}
+
+test('RHB1 issuance binds the exact existing RH1, device hardware and key without changing its supporter ID', () => {
+  const { row, license, proof } = fixture();
+  const output = binding.issue(row, issuer.privateKey, issuer.publicKey);
+  const [old, certificate] = output.trim().split('\n');
+  assert.equal(old, license);
+  const info = binding.verifyCertificate(certificate, old, issuer.publicKey);
+  assert.equal(info.sid, '0027');
+  assert.equal(info.device, device);
+  assert.equal(info.hardware_hash, proof.HardwareHash);
+  assert.equal(info.key_fingerprint, proof.KeyFingerprint);
+  assert.equal(info.license_sha256, binding.sha256(license));
+});
+
+test('binding issuance refuses unbound, duplicate, corrupt and mismatched records', () => {
+  const { row, records, proof } = fixture();
+  const plan = binding.plan(records, [], issuer.publicKey);
+  assert.equal(plan.rows[0].binding, null);
+  assert.throws(() => binding.issue(plan.rows[0], issuer.privateKey, issuer.publicKey), /unbound/);
+  assert.throws(() => binding.plan(records, [proof, proof], issuer.publicKey), /duplicate/);
+  assert.throws(() => binding.plan(records, [{ ...proof, KeyFingerprint: 'A'.repeat(64) }], issuer.publicKey), /fingerprint/);
+  assert.throws(() => binding.plan([{ ...records[0], SupporterId: '0028' }], [proof], issuer.publicKey), /identity/);
+  const stranger = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  assert.throws(() => binding.issue(row, stranger.privateKey, issuer.publicKey), /wrong-issuer/);
+});
+
+test('binding verification rejects altered payloads, an unrelated issuer, replay onto another license and wrong signing domain', () => {
+  const { row, license } = fixture();
+  const certificate = binding.issue(row, issuer.privateKey, issuer.publicKey).trim().split('\n')[1];
+  const info = binding.verifyCertificate(certificate, license, issuer.publicKey);
+  const parts = certificate.split('.');
+  parts[1] = Buffer.from(JSON.stringify({ ...info, device: 'FFFF-FFFF-FFFF-FFFF-FFFF-FFFF-FFFF-FFFF' })).toString('base64url');
+  assert.throws(() => binding.verifyCertificate(parts.join('.'), license, issuer.publicKey), /signature/);
+  const stranger = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  assert.throws(() => binding.verifyCertificate(certificate, license, stranger.publicKey), /signature/);
+  const differentLicense = signedWire('RH1', { v: 1, product: 'DopamineRH', sid: '0027', device, ent: ['custom_glass'], extra: true });
+  assert.throws(() => binding.verifyCertificate(certificate, differentLicense, issuer.publicKey), /digest/);
+  assert.throws(() => binding.verifyCertificate(signedWire('RHB1', info), license, issuer.publicKey), /signature/);
+  assert.throws(() => binding.verifyCertificate(signedWire('RHB1', { ...info, extra: true }, issuer.privateKey,
+    binding.bindingDomain), license, issuer.publicKey), /fields/);
+});
+
+test('issuer planning opens only records and bindings, never the private key or challenge store', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-binding-plan-'));
+  try {
+    fs.writeFileSync(path.join(directory, 'supporters.json'), '[]');
+    fs.writeFileSync(path.join(directory, 'supporter-device-proof-bindings.json'), '[]');
+    const result = JSON.parse(execFileSync(process.execPath, [path.join(root, 'scripts/supporter-binding.cjs'),
+      'plan', '--issuer-dir', directory], { encoding: 'utf8' }));
+    assert.equal(result.total, 0);
+    assert.deepEqual(fs.readdirSync(directory).sort(), ['supporter-device-proof-bindings.json', 'supporters.json']);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+function captureMain(argv) {
+  const original = console.log;
+  let output;
+  console.log = value => { output = value; };
+  try { binding.main([...argv], issuer.publicKey); return JSON.parse(output); }
+  finally { console.log = original; }
+}
+
+function issuerFixture(run) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-binding-issuer-'));
+  const { records, proof } = fixture();
+  const recordsFile = path.join(directory, 'supporters.json');
+  const bindingsFile = path.join(directory, 'supporter-device-proof-bindings.json');
+  fs.writeFileSync(recordsFile, JSON.stringify(records));
+  fs.writeFileSync(bindingsFile, JSON.stringify([proof]));
+  try { run({ directory, recordsFile, bindingsFile, records, proof }); }
+  finally { fs.rmSync(directory, { recursive: true, force: true }); }
+}
+
+test('migration preview preserves separate user, device, issued date and notes without changing licenses or source records', () => {
+  issuerFixture(({ directory, recordsFile, records }) => {
+    const note = '\u6d4b\u8bd5\u7528\u6237 / contact\r\nsecond line';
+    const displayName = '\u6d4b\u8bd5\u7528\u6237\u540d';
+    const lastIssuedAt = '2026-11-12 10:20:30';
+    const beforePlan = captureMain(['plan', '--issuer-dir', directory]);
+    fs.writeFileSync(recordsFile, JSON.stringify([{ ...records[0], DisplayName: displayName, LastIssuedAt: lastIssuedAt, Note: note }]));
+    const before = fs.readFileSync(recordsFile);
+    const preview = captureMain(['plan', '--issuer-dir', directory]);
+    assert.equal(preview.records[0].id, '0027');
+    assert.equal(preview.records[0].displayName, displayName);
+    assert.equal(preview.records[0].deviceCode, device);
+    assert.equal(preview.records[0].lastIssuedAt, lastIssuedAt);
+    assert.equal(preview.records[0].note, note);
+    assert.notEqual(preview.records[0].reviewSha256, beforePlan.records[0].reviewSha256);
+    assert.deepEqual(fs.readFileSync(recordsFile), before);
+    const { proof } = fixture();
+    const row = binding.plan([{ ...records[0], DisplayName: displayName, LastIssuedAt: lastIssuedAt, Note: note }], [proof], issuer.publicKey).rows[0];
+    const [license, certificate] = binding.issue(row, issuer.privateKey, issuer.publicKey).trim().split('\n');
+    assert.equal(license, records[0].License);
+    const info = binding.verifyCertificate(certificate, license, issuer.publicKey);
+    assert.equal(Object.hasOwn(info, 'note'), false);
+    assert.equal(Object.hasOwn(info, 'Note'), false);
+    assert.equal(Object.hasOwn(info, 'DisplayName'), false);
+    assert.equal(Object.hasOwn(info, 'displayName'), false);
+    assert.equal(Object.hasOwn(info, 'lastIssuedAt'), false);
+    for (const value of [undefined, null, 42, { name: 'not-a-note' }]) {
+      const legacy = binding.plan([{ ...records[0], DisplayName: value, LastIssuedAt: value, Note: value }], [proof], issuer.publicKey);
+      assert.equal(legacy.rows[0].note, '');
+      assert.equal(legacy.rows[0].displayName, '');
+      assert.equal(legacy.rows[0].lastIssuedAt, '');
+    }
+  });
+});
+
+test('review digests bind selected signed licenses and exact device bindings, independent of record order', () => {
+  const { row } = fixture();
+  const digest = binding.reviewSha256([row]);
+  assert.match(digest, /^[0-9A-F]{64}$/);
+  assert.notEqual(binding.reviewSha256([{ ...row, binding: null }]), digest);
+  assert.notEqual(binding.reviewSha256([{ ...row, binding: { ...row.binding, HardwareHash: 'B'.repeat(64) } }]), digest);
+  assert.notEqual(binding.reviewSha256([{ ...row, license: row.license + 'x' }]), digest);
+  assert.notEqual(binding.reviewSha256([{ ...row, note: 'changed contact' }]), digest);
+  assert.notEqual(binding.reviewSha256([{ ...row, displayName: 'changed user' }]), digest);
+  assert.notEqual(binding.reviewSha256([{ ...row, lastIssuedAt: '2026-11-12 11:22:33' }]), digest);
+  const other = { ...row, id: '0028' };
+  assert.equal(binding.reviewSha256([row, other]), binding.reviewSha256([other, row]));
+});
+
+test('issuance requires the reviewed snapshot and rejects stale bindings before opening any private key', () => {
+  issuerFixture(({ directory, recordsFile, bindingsFile, records, proof }) => {
+    const plan = captureMain(['plan', '--issuer-dir', directory]);
+    const argv = ['issue', '--issuer-dir', directory, '--id', '0027', '--out', path.join(directory, 'out.txt')];
+    assert.throws(() => captureMain([...argv]), /review-sha256-required/);
+    assert.throws(() => captureMain([...argv, '--review-sha256', 'A'.repeat(64)]), /review-stale/);
+    fs.writeFileSync(recordsFile, JSON.stringify([{ ...records[0], DisplayName: 'changed after review' }]));
+    assert.throws(() => captureMain([...argv, '--review-sha256', plan.records[0].reviewSha256]), /review-stale/);
+    fs.writeFileSync(recordsFile, JSON.stringify([{ ...records[0], Note: 'changed after review' }]));
+    assert.throws(() => captureMain([...argv, '--review-sha256', plan.records[0].reviewSha256]), /review-stale/);
+    fs.writeFileSync(recordsFile, JSON.stringify(records));
+    fs.writeFileSync(bindingsFile, JSON.stringify([{ ...proof, HardwareHash: 'B'.repeat(64) }]));
+    assert.throws(() => captureMain([...argv, '--review-sha256', plan.records[0].reviewSha256]), /review-stale/);
+    assert.equal(fs.existsSync(path.join(directory, 'out.txt')), false);
+  });
+});
+
+test('existing and source outputs are rejected before reading the issuer key', () => {
+  issuerFixture(({ directory, recordsFile }) => {
+    const plan = captureMain(['plan', '--issuer-dir', directory]);
+    const filename = path.join(directory, 'existing.txt');
+    fs.writeFileSync(filename, 'keep');
+    for (const output of [filename, recordsFile, path.join(directory, 'DopamineRH-supporter-private.pem')])
+      assert.throws(() => captureMain(['issue', '--issuer-dir', directory, '--id', '0027', '--out', output,
+        '--review-sha256', plan.records[0].reviewSha256]), /output-exists-or-is-source-data/);
+    assert.equal(fs.readFileSync(filename, 'utf8'), 'keep');
+  });
+});
+
+test('oversized databases are refused without parsing or opening an issuer key', () => {
+  issuerFixture(({ directory, recordsFile }) => {
+    fs.truncateSync(recordsFile, 16 * 1024 * 1024 + 1);
+    assert.throws(() => captureMain(['plan', '--issuer-dir', directory]), /database-too-large/);
+  });
+});
+
+test('reviewed single and batch issuance use only disposable issuer data and leave databases unchanged', () => {
+  issuerFixture(({ directory, recordsFile, bindingsFile, records, proof }) => {
+    const otherDevice = 'FFFF-FFFF-FFFF-FFFF-FFFF-FFFF-FFFF-FFFF';
+    const otherLicense = signedWire('RH1', { v: 1, product: 'DopamineRH', sid: '0028', device: otherDevice, ent: ['custom_glass'] });
+    fs.writeFileSync(recordsFile, JSON.stringify([...records, { SupporterId: '0028', DeviceCode: otherDevice, License: otherLicense }]));
+    fs.writeFileSync(bindingsFile, JSON.stringify([proof, { ...proof, DeviceCode: otherDevice }]));
+    const before = [fs.readFileSync(recordsFile), fs.readFileSync(bindingsFile)];
+    fs.writeFileSync(path.join(directory, 'DopamineRH-supporter-private.pem'),
+      issuer.privateKey.export({ type: 'pkcs8', format: 'pem' }));
+    const plan = captureMain(['plan', '--issuer-dir', directory]);
+    const single = path.join(directory, 'single', 'bound.txt');
+    const batch = path.join(directory, 'batch');
+    for (const argv of [
+      ['issue', '--issuer-dir', directory, '--id', '0027', '--out', single, '--review-sha256', plan.records[0].reviewSha256],
+      ['issue-all', '--issuer-dir', directory, '--out-dir', batch, '--review-sha256', plan.reviewSha256],
+    ]) {
+      const result = captureMain(argv);
+      assert.equal(result.issued, argv[0] === 'issue' ? 1 : 2);
+      assert.equal(result.sourceDatabasesChanged, false);
+      assert.deepEqual(result.cleanupWarnings, []);
+    }
+    for (const filename of [single, path.join(batch, 'supporter-0027-bound.txt'), path.join(batch, 'supporter-0028-bound.txt')]) {
+      const [license, certificate] = fs.readFileSync(filename, 'utf8').trim().split('\n');
+      binding.verifyCertificate(certificate, license, issuer.publicKey);
+      if (process.platform !== 'win32') assert.equal(fs.statSync(filename).mode & 0o777, 0o600);
+    }
+    assert.deepEqual(fs.readdirSync(path.dirname(single)), ['bound.txt']);
+    assert.deepEqual(fs.readdirSync(batch).sort(), ['supporter-0027-bound.txt', 'supporter-0028-bound.txt']);
+    assert.deepEqual([fs.readFileSync(recordsFile), fs.readFileSync(bindingsFile)], before);
+  });
+});
+
+function publicationFixture(run) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-binding-publish-'));
+  const outputs = ['one', 'two'].map(name => ({ filename: path.join(directory, `${name}.txt`), content: name }));
+  try { run(directory, outputs); }
+  finally { fs.rmSync(directory, { recursive: true, force: true }); }
+}
+
+test('publication writes and syncs all files before exposing outputs; write failures leave no partial batch', () => {
+  publicationFixture((directory, outputs) => {
+    let writes = 0;
+    const io = { ...fs, writeFileSync(...args) {
+      assert.equal(outputs.some(output => fs.existsSync(output.filename)), false);
+      fs.writeFileSync(...args);
+      if (++writes === 2) throw new Error('injected-write-failure');
+    } };
+    assert.throws(() => binding.publishOutputs(outputs, io), /injected-write-failure/);
+    assert.deepEqual(fs.readdirSync(directory), []);
+  });
+});
+
+test('publication failure rolls back its own outputs without overwriting a concurrent file', () => {
+  publicationFixture((directory, outputs) => {
+    let links = 0;
+    const io = { ...fs, linkSync(source, target) {
+      if (++links === 2) fs.writeFileSync(target, 'concurrent-user-file', { flag: 'wx' });
+      fs.linkSync(source, target);
+    } };
+    assert.throws(() => binding.publishOutputs(outputs, io), /EEXIST/);
+    assert.deepEqual(fs.readdirSync(directory), ['two.txt']);
+    assert.equal(fs.readFileSync(outputs[1].filename, 'utf8'), 'concurrent-user-file');
+  });
+});
+
+test('publication refuses pre-existing targets including dangling links and unsupported hard-link filesystems', () => {
+  publicationFixture((directory, outputs) => {
+    fs.writeFileSync(outputs[0].filename, 'keep');
+    assert.throws(() => binding.publishOutputs(outputs), /output-already-exists/);
+    assert.equal(fs.readFileSync(outputs[0].filename, 'utf8'), 'keep');
+    fs.unlinkSync(outputs[0].filename);
+    if (process.platform !== 'win32') {
+      fs.symlinkSync(path.join(directory, 'missing'), outputs[0].filename);
+      assert.throws(() => binding.publishOutputs(outputs), /output-already-exists/);
+      assert.equal(fs.lstatSync(outputs[0].filename).isSymbolicLink(), true);
+      fs.unlinkSync(outputs[0].filename);
+    }
+    const io = { ...fs, linkSync() { throw new Error('injected-links-unsupported'); } };
+    assert.throws(() => binding.publishOutputs(outputs, io), /injected-links-unsupported/);
+    assert.deepEqual(fs.readdirSync(directory), []);
+  });
+});
+
+test('rollback preserves replaced outputs and reports incomplete cleanup rather than claiming success', () => {
+  publicationFixture((directory, outputs) => {
+    let links = 0;
+    const io = { ...fs, linkSync(source, target) {
+      if (++links === 2) {
+        fs.unlinkSync(outputs[0].filename);
+        fs.writeFileSync(outputs[0].filename, 'replacement', { flag: 'wx' });
+        throw new Error('injected-publish-failure');
+      }
+      fs.linkSync(source, target);
+    } };
+    assert.throws(() => binding.publishOutputs(outputs, io), /injected-publish-failure; cleanup-incomplete:/);
+    assert.deepEqual(fs.readdirSync(directory), ['one.txt']);
+    assert.equal(fs.readFileSync(outputs[0].filename, 'utf8'), 'replacement');
+  });
+});
+
+test('successful publication reports staging cleanup warnings without inviting duplicate issuance', () => {
+  publicationFixture((directory, outputs) => {
+    const io = { ...fs, rmdirSync() { throw new Error('injected-cleanup-failure'); } };
+    const warnings = binding.publishOutputs(outputs, io);
+    assert.equal(warnings.length, 1);
+    assert.equal(path.dirname(warnings[0]), directory);
+    for (const output of outputs) assert.equal(fs.readFileSync(output.filename, 'utf8'), output.content);
+  });
+});
+
+test('App validates issuer signature before payload parsing, hardware and fresh device-key possession', () => {
+  const parser = body(app, 'DORHSupporterBindingCertificateInfo');
+  assert.ok(parser.indexOf('SecKeyVerifySignature(') < parser.indexOf('JSONObjectWithData:payload'));
+  assert.match(parser, /DopamineRH-RHB1-Sign-v1/);
+  const verify = body(app, 'DORHSupporterVerifyBoundLicense');
+  assert.match(verify, /DORHSupporterVerifyLicenseCodeForDevice\(license, binding\[@"device"\]/);
+  assert.match(verify, /hardware\[@"hardware_hash"\]/);
+  assert.match(verify, /DORHSupporterProveBoundDeviceKey/);
+  const proof = body(app, 'DORHSupporterProveBoundDeviceKey');
+  assert.match(proof, /SecRandomCopyBytes/);
+  assert.match(proof, /DORHSupporterSignWithDeviceKey/);
+  assert.match(proof, /DORHSupporterVerifyDeviceKeySignature/);
+  const lookup = body(app, 'DORHSupporterCopyExistingDevicePrivateKey');
+  assert.match(lookup, /SecItemCopyMatching/);
+  assert.doesNotMatch(lookup, /SecKeyCreateRandomKey|SecItemDelete/);
+  assert.match(lookup, /DORHSupporterDeviceKeyIsSecureEnclaveP256PrivateKey/);
+});
+
+test('binding activation is atomic, deletion preserves the binding-required flag and malformed bound state cannot fall back', () => {
+  const store = body(licenseSource, 'DORHSupporterStoreActivationText');
+  assert.ok(store.indexOf('DORHSupporterVerifyBoundLicense(') < store.indexOf('DORHSupporterWritePersistentState(state)'));
+  assert.ok(store.indexOf('DORHSupporterWritePersistentState(state)') < store.indexOf('setObject:license'));
+  assert.match(store, /state\[DORHSupporterBindingRequiredKey\] = @YES/);
+  const remove = body(licenseSource, 'DORHSupporterRemoveLicense');
+  assert.match(remove, /removeObjectForKey:DORHSupporterBindingCertificateKey/);
+  assert.doesNotMatch(remove, /removeObjectForKey:DORHSupporterBindingRequiredKey/);
+  const verify = body(licenseSource, 'DORHSupporterVerifyLicenseCode');
+  assert.ok(verify.indexOf('DORHSupporterVerifyBoundLicense') < verify.indexOf('DORHSupporterDeviceCode()'));
+  assert.match(verify, /if \(DORHSupporterBindingIsRequired\(\)\)/);
+  assert.match(app, /#define DORH_SUPPORTER_REQUIRE_BINDING 0/);
+  const required = body(app, 'DORHSupporterBindingIsRequired');
+  assert.match(required, /state\[DORHSupporterBindingCertificateKey\] != nil/);
+});
+
+test('native Security verifies production binding parser and device-possession code using mock hardware and disposable software keys', {
+  skip: process.platform !== 'darwin' ? 'Requires macOS Foundation/Security; not a Secure Enclave device test.' : false,
+}, () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-binding-native-'));
+  try {
+    const helperNames = ['DORHSupporterLicenseError', 'DORHSupporterBase64URLToBase64', 'DORHSupporterDecodeBase64URL',
+      'DORHSupporterIsUppercaseHexString', 'DORHSupporterCopyDevicePublicKeyData',
+      'DORHSupporterDeviceKeyFingerprint', 'DORHSupporterSignWithDeviceKey',
+      'DORHSupporterVerifyDeviceKeySignature', 'DORHSupporterVerifyLicenseCodeForDevice'];
+    const issuerJwk = issuer.publicKey.export({ format: 'jwk' });
+    const issuerData = Buffer.concat([Buffer.from([4]), Buffer.from(issuerJwk.x, 'base64url'), Buffer.from(issuerJwk.y, 'base64url')]);
+    const source = `#import <Foundation/Foundation.h>
+#import <Security/Security.h>
+#import <CommonCrypto/CommonDigest.h>
+static NSString * const DORHSupporterLicenseErrorDomain = @"BindingTest";
+static NSString * const DORHSupporterDeviceKeyTag = @"test-only";
+static NSString *scenario;
+static SecKeyRef devicePrivate;
+static inline SecKeyRef DORHSupporterCreatePublicKey(void);
+static NSDictionary *DORHSupporterReadPersistentState(void) { return @{}; }
+${helperNames.map(name => body(licenseSource, name)).join('\n')}
+static inline SecKeyRef DORHSupporterCreatePublicKey(void) {
+  NSData *point = [[NSData alloc] initWithBase64EncodedString:@"${issuerData.toString('base64')}" options:0];
+  return SecKeyCreateWithData((__bridge CFDataRef)point, (__bridge CFDictionaryRef)@{
+    (__bridge id)kSecAttrKeyType:(__bridge id)kSecAttrKeyTypeECSECPrimeRandom,
+    (__bridge id)kSecAttrKeyClass:(__bridge id)kSecAttrKeyClassPublic,
+    (__bridge id)kSecAttrKeySizeInBits:@256}, NULL);
+}
+static inline NSDictionary *DORHSupporterHardwareIdentityProbe(void) {
+  return @{@"available":@YES, @"algorithm":@"rh-hw-v1", @"hardware_hash":
+    [scenario isEqual:@"hardware-mismatch"] ? @"${'F'.repeat(64)}" : @"${hardwareHash}"};
+}
+static inline BOOL DORHSupporterDeviceKeyIsSecureEnclaveP256PrivateKey(SecKeyRef key) { return key != NULL; }
+static OSStatus testLookup(CFDictionaryRef query, CFTypeRef *result) {
+  if ([scenario isEqual:@"missing-key"]) return errSecItemNotFound;
+  *result = CFRetain(devicePrivate); return errSecSuccess;
+}
+#define SecItemCopyMatching testLookup
+${app}
+#undef SecItemCopyMatching
+int main(int argc, char **argv) { @autoreleasepool {
+  scenario = [NSString stringWithUTF8String:argv[1]];
+  NSDictionary *attributes = @{(__bridge id)kSecAttrKeyType:(__bridge id)kSecAttrKeyTypeECSECPrimeRandom,
+    (__bridge id)kSecAttrKeySizeInBits:@256};
+  if ([scenario isEqual:@"keygen"]) {
+    SecKeyRef key = SecKeyCreateRandomKey((__bridge CFDictionaryRef)attributes, NULL);
+    if (!key) return 10;
+    CFDataRef bytes = SecKeyCopyExternalRepresentation(key, NULL);
+    if (!bytes) return 11;
+    puts([[(__bridge NSData *)bytes base64EncodedStringWithOptions:0] UTF8String]);
+    CFRelease(bytes); CFRelease(key); return 0;
+  }
+  NSData *raw = [[NSData alloc] initWithBase64EncodedString:[NSString stringWithUTF8String:argv[2]] options:0];
+  NSMutableDictionary *privateAttributes = [attributes mutableCopy];
+  privateAttributes[(__bridge id)kSecAttrKeyClass] = (__bridge id)kSecAttrKeyClassPrivate;
+  devicePrivate = SecKeyCreateWithData((__bridge CFDataRef)raw, (__bridge CFDictionaryRef)privateAttributes, NULL);
+  if (!devicePrivate) return 12;
+  if ([scenario isEqual:@"key-mismatch"]) {
+    CFRelease(devicePrivate); devicePrivate = SecKeyCreateRandomKey((__bridge CFDictionaryRef)attributes, NULL);
+  }
+  NSError *error = nil;
+  NSString *license = [NSString stringWithUTF8String:argv[3]];
+  NSString *certificate = [NSString stringWithUTF8String:argv[4]];
+  NSDictionary *info = DORHSupporterVerifyBoundLicense(license, certificate, &error);
+  CFRelease(devicePrivate);
+  BOOL expected = [scenario isEqual:@"valid"];
+  return ((info != nil) == expected) ? 0 : 13;
+} }
+`;
+    const file = path.join(directory, 'binding.m');
+    const binary = path.join(directory, 'binding-test');
+    fs.writeFileSync(file, source);
+    execFileSync('xcrun', ['clang', '-fobjc-arc', '-Wno-deprecated-declarations', '-framework', 'Foundation', '-framework', 'Security', file, '-o', binary]);
+    const keyData = execFileSync(binary, ['keygen'], { encoding: 'utf8' }).trim();
+    const raw = Buffer.from(keyData, 'base64');
+    assert.equal(raw.length, 97, 'P-256 X9.63 private representation');
+    const { records, proof } = fixture();
+    const nativePoint = raw.subarray(0, 65);
+    const nativeProof = { ...proof, PublicKey: nativePoint.toString('base64url'), KeyFingerprint: binding.sha256(nativePoint) };
+    const row = binding.plan(records, [nativeProof], issuer.publicKey).rows[0];
+    const [license, certificate] = binding.issue(row, issuer.privateKey, issuer.publicKey).trim().split('\n');
+    for (const scenario of ['valid', 'hardware-mismatch', 'key-mismatch', 'missing-key'])
+      execFileSync(binary, [scenario, keyData, license, certificate]);
+    execFileSync(binary, ['tampered', keyData, license, certificate.slice(0, -2)]);
+    const otherLicense = signedWire('RH1', { v: 1, product: 'DopamineRH', sid: '0028', device, ent: ['custom_glass'] });
+    execFileSync(binary, ['wrong-license', keyData, otherLicense, certificate]);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('render authorization is display-only and license mutations invalidate it before notifying views', () => {
+  for (const name of ['DORHSupporterStoreLicenseCode', 'DORHSupporterStoreActivationText', 'DORHSupporterRemoveLicense']) {
+    const method = body(licenseSource, name);
+    assert.ok(method.indexOf('DORHSupporterInvalidateRenderAuthorization()') < method.indexOf('postNotificationName:'));
+    assert.ok(method.indexOf('DORHSupporterInvalidateRenderAuthorization()') > method.indexOf('DORHSupporterWritePersistentState('));
+  }
+  const render = read('Application/Dopamine/UI/DOSupporterRenderAuthorization.h');
+  assert.match(render, /queue:nil/);
+  assert.match(render, /UIApplicationWillResignActiveNotification/);
+  assert.match(render, /UIApplicationDidBecomeActiveNotification/);
+  assert.match(render, /now - \[state\[@"checkedAt"\] doubleValue\] >= 1\.0/);
+  for (const file of ['DOMainViewController.m', '../Jailbreak/DOJailbreaker.m', 'DOSupporterLicenseUI.h'])
+    assert.doesNotMatch(read('Application/Dopamine/UI/' + file), /DORHSupporterRenderIsVerified/);
+  assert.doesNotMatch(body(licenseSource, 'DORHSupporterIsVerified'), /Render/);
+  const theme = read('Application/Dopamine/UI/DOCustomGlassView.m');
+  assert.match(theme, /- \(void\)reloadMaterial\s*\{[\s\S]*?DORHSupporterRenderIsVerified\(\)/);
+  assert.match(theme, /if \(!DORHSupporterIsVerified\(\)\)/);
+});
+
+test('native render snapshot is shared across translation units, expires and invalidates before earlier view observers run', {
+  skip: process.platform !== 'darwin' ? 'Requires macOS Foundation/Objective-C runtime; authorization is a test double.' : false,
+}, () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-render-authorization-'));
+  try {
+    const prefix = `#import <Foundation/Foundation.h>
+#import <objc/runtime.h>
+extern NSString * const DORHSupporterLicenseDidChangeNotification;
+extern NSString * const UIApplicationWillResignActiveNotification;
+extern NSString * const UIApplicationDidBecomeActiveNotification;
+extern NSTimeInterval testUptime;
+BOOL DORHSupporterIsVerified(void);
+${body(licenseSource, 'DORHSupporterInvalidateRenderAuthorization')}
+`;
+    const header = read('Application/Dopamine/UI/DOSupporterRenderAuthorization.h')
+      .replace('#import "DOSupporterLicense.h"', prefix)
+      .replace('NSProcessInfo.processInfo.systemUptime', 'testUptime');
+    fs.writeFileSync(path.join(directory, 'render.h'), header);
+    fs.writeFileSync(path.join(directory, 'other.m'), `#import "render.h"
+BOOL otherRender(void) { return DORHSupporterRenderIsVerified(); }
+`);
+    const source = `#import "render.h"
+NSString * const DORHSupporterLicenseDidChangeNotification = @"license";
+NSString * const UIApplicationWillResignActiveNotification = @"resign";
+NSString * const UIApplicationDidBecomeActiveNotification = @"active";
+NSTimeInterval testUptime = 100;
+static BOOL entitled;
+static NSUInteger checks;
+BOOL DORHSupporterIsVerified(void) { checks++; return entitled; }
+BOOL otherRender(void);
+#define CHECK(value) do { if (!(value)) { fprintf(stderr, "check failed at line %d\\n", __LINE__); return 1; } } while (0)
+int main(void) { @autoreleasepool {
+  __block BOOL notifiedValue = YES;
+  // Views can register before the lazy cache observer. Mutation must invalidate first.
+  id earlier = [NSNotificationCenter.defaultCenter addObserverForName:DORHSupporterLicenseDidChangeNotification
+    object:nil queue:nil usingBlock:^(NSNotification *n) { notifiedValue = otherRender(); }];
+  CHECK(!DORHSupporterRenderIsVerified() && checks == 1);
+  for (int i = 0; i < 100; i++) CHECK(!otherRender());
+  CHECK(checks == 1);
+  entitled = YES;
+  CHECK(!otherRender() && checks == 1);
+  DORHSupporterInvalidateRenderAuthorization();
+  [NSNotificationCenter.defaultCenter postNotificationName:DORHSupporterLicenseDidChangeNotification object:nil];
+  CHECK(notifiedValue && DORHSupporterRenderIsVerified() && checks >= 2 && checks <= 3);
+  NSUInteger previous = checks;
+  entitled = NO;
+  DORHSupporterInvalidateRenderAuthorization();
+  [NSNotificationCenter.defaultCenter postNotificationName:DORHSupporterLicenseDidChangeNotification object:nil];
+  CHECK(!notifiedValue && !otherRender() && checks > previous && checks <= previous + 2);
+  previous = checks;
+  entitled = YES;
+  testUptime += 1.01;
+  CHECK(otherRender() && DORHSupporterRenderIsVerified() && checks == previous + 1);
+  previous = checks;
+  entitled = NO;
+  // The action check is always fresh, independently of the display snapshot.
+  CHECK(!DORHSupporterIsVerified() && otherRender() && checks == previous + 1);
+  previous = checks;
+  [NSNotificationCenter.defaultCenter postNotificationName:UIApplicationWillResignActiveNotification object:nil];
+  CHECK(!otherRender() && checks == previous + 1);
+  previous = checks;
+  entitled = YES;
+  [NSNotificationCenter.defaultCenter postNotificationName:UIApplicationDidBecomeActiveNotification object:nil];
+  CHECK(DORHSupporterRenderIsVerified() && checks == previous + 1);
+  [NSNotificationCenter.defaultCenter removeObserver:earlier];
+  return 0;
+} }
+`;
+    const file = path.join(directory, 'main.m');
+    const binary = path.join(directory, 'render-test');
+    fs.writeFileSync(file, source);
+    execFileSync('xcrun', ['clang', '-fobjc-arc', '-framework', 'Foundation', file, path.join(directory, 'other.m'), '-o', binary]);
+    execFileSync(binary, []);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
