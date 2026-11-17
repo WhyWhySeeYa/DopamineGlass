@@ -105,3 +105,5 @@ Xcode 16.4 构建兼容：设置/关于页显式引用上层目录的主题策�
 成功构建：`https://github.com/kulinichx/DopamineGlass/actions/runs/44094121720`，产物 `DopamineGlass-official-core-TEST-5`。包含 `.ipa`、同内容的 `.tipa`、`BUILD-REPORT.json` 和测试包说明。编译、签名身份检查及所有 48 个底层文件的最终归档 SHA-256 校验全部通过。
 
 按用户后续要求，独立 App 打包流程现移除内置 `zebra.deb`，并从最终 `PkgManagers.plist` 中仅移除 `xyz.willy.Zebra` 对应条目，保留 Sileo 原条目和安装包。所有 46 个其余保护文件继续逐字节校验；原始 Zebra 包和配置也先按输入哈希核验，并在报告中单列删改结果。不会卸载设备上已有的 Zebra。原源码、底层模块与依赖锁定未改；未来全源码路线如恢复，需同步采用这项已授权的资源裁剪。产物仍按用户要求保留 IPA/TIPA 两种后缀。
+
+去斑马版本已构建成功：运行 `44097054652`，源码 `7d37fcd`，产物 `DopamineGlass-official-core-TEST-6`。单个 IPA/TIPA 为 31,327,830 字节（29.88 MiB），SHA-256 `6d441074c968bd3cdf4ee8f79126487b004a4e733e1e168c4d60e58977bd3b16`。已下载后独立核对 ZIP/安装包哈希、Zebra 不存在、Sileo 字节完整以及全部 46 个保留文件。设备上已安装 Zebra 不会因此卸载；真机授权和越狱操作尚待验收。

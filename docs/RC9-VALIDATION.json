@@ -118,7 +118,7 @@
     "artifactZIPSHA256": "3326d0077558fa880f10b8418257b9896d706c4cc1fc5841003fe370b1533a67"
   },
   "zebraRemoval": {
-    "status": "implemented and locally tested; cloud candidate pending",
+    "status": "SUCCESS: cloud build and independent local archive verification passed",
     "scope": "package only: remove zebra.deb and exactly Zebra manager entry, keep Sileo unchanged; do not uninstall device apps",
     "preservedOfficialFiles": 46,
     "customizationInputFiles": [
@@ -139,6 +139,17 @@
     "installerFormats": [
       "ipa",
       "tipa"
-    ]
+    ],
+    "run": 44097054652,
+    "sourceCommit": "7d37fcd89991039daeb3e821ac5b721c92c502ba",
+    "artifact": "DopamineGlass-official-core-TEST-6",
+    "artifactZIPBytes": 62587460,
+    "artifactZIPSHA256": "45a9dbdd59f59f1914faa02e5f7e21e725225a3a6ffe342eb035a24c180385bd",
+    "installerBytes": 31327830,
+    "installerMiB": 29.88,
+    "installerSHA256": "6d441074c968bd3cdf4ee8f79126487b004a4e733e1e168c4d60e58977bd3b16",
+    "localVerification": "Artifact ZIP digest matches GitHub; IPA/TIPA digests match build report; no zebra.deb; manager list equals original minus exactly Zebra; original Sileo bytes and all 46 preserved file SHA256 match; Mach-O arm64 iOS15, no linked runner-absolute library paths",
+    "localOutput": "../builds/44097054652",
+    "deviceValidation": "not run"
   }
 }
