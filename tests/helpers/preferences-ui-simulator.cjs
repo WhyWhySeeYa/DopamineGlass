@@ -44,7 +44,7 @@ async function run() {
   const command = async (args, timeout = 90000) => {
     console.log('[UIKit]', args.join(' '));
     try {
-      const { stdout } = await execFileAsync('xcrun', args, { encoding: 'utf8', timeout, maxBuffer: 8 * 1024 * 1024 });
+      const { stdout } = await execFileAsync('xcrun', args, { encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 8 * 1024 * 1024 });
       return stdout.trim();
     } catch (error) {
       fs.appendFileSync(path.join(output, 'commands.log'), `${args.join(' ')}\n${error.stdout || ''}\n${error.stderr || ''}\n${error.message}\n${JSON.stringify({ timeout, killed: error.killed, signal: error.signal, code: error.code })}\n`);
@@ -53,22 +53,11 @@ async function run() {
   };
   let device;
   try {
-    // CoreSimulator's first service start on a fresh hosted runner can exceed a minute.
-    // Keep a bounded cold-start allowance; a timeout still fails the native check.
-    const runtimes = JSON.parse(await command(['simctl', 'list', 'runtimes', '-j'], 240000)).runtimes;
-    const runtime = runtimes.find(item => item.isAvailable && item.identifier.includes('.iOS-') &&
-      (!process.env.DORH_SIMULATOR_RUNTIME || item.version === process.env.DORH_SIMULATOR_RUNTIME));
-    assert.ok(runtime, 'No available iOS Simulator runtime; UIKit check cannot be replaced with source checks.');
-    const miniTypes = JSON.parse(await command(['simctl', 'list', 'devicetypes', '-j'])).devicetypes
-      .filter(item => item.name.startsWith('iPad mini'));
-    const type = miniTypes.find(item => item.name === 'iPad mini (6th generation)') || miniTypes.at(-1);
-    assert.ok(type, 'No iPad mini simulator device type.');
     const app = path.join(directory, 'RHLayout.app');
     fs.mkdirSync(app);
     const file = path.join(directory, 'harness.m');
     fs.writeFileSync(file, harnessSource());
     const sdk = await command(['--sdk', 'iphonesimulator', '--show-sdk-path']);
-    fs.writeFileSync(path.join(output, 'environment.json'), JSON.stringify({ runtime, type, sdk, arch: process.arch }, null, 2));
     await command(['--sdk', 'iphonesimulator', 'clang', '-fobjc-arc', '-fmodules', '-isysroot', sdk,
       '-target', `${process.arch === 'arm64' ? 'arm64' : 'x86_64'}-apple-ios16.0-simulator`,
       '-framework', 'UIKit', '-framework', 'QuartzCore', file, '-o', path.join(app, 'RHLayout')], 120000);
@@ -83,6 +72,20 @@ async function run() {
 <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
 <key>UILaunchScreen</key><dict/>
 </dict></plist>`);
+    // Compile production snippets before asking the simulator service to start.
+    // Even runtime startup failures then preserve native compilation evidence.
+    fs.writeFileSync(path.join(output, 'environment.json'), JSON.stringify({ sdk, arch: process.arch, nativeCompilation: 'passed' }, null, 2));
+    // CoreSimulator's first service start on a fresh hosted runner can exceed a minute.
+    // Keep a bounded cold-start allowance; a timeout still fails the native check.
+    const runtimes = JSON.parse(await command(['simctl', 'list', 'runtimes', '-j'], 240000)).runtimes;
+    const runtime = runtimes.find(item => item.isAvailable && item.identifier.includes('.iOS-') &&
+      (!process.env.DORH_SIMULATOR_RUNTIME || item.version === process.env.DORH_SIMULATOR_RUNTIME));
+    assert.ok(runtime, 'No available iOS Simulator runtime; UIKit check cannot be replaced with source checks.');
+    const miniTypes = JSON.parse(await command(['simctl', 'list', 'devicetypes', '-j'])).devicetypes
+      .filter(item => item.name.startsWith('iPad mini'));
+    const type = miniTypes.find(item => item.name === 'iPad mini (6th generation)') || miniTypes.at(-1);
+    assert.ok(type, 'No iPad mini simulator device type.');
+    fs.writeFileSync(path.join(output, 'environment.json'), JSON.stringify({ runtime, type, sdk, arch: process.arch, nativeCompilation: 'passed' }, null, 2));
     device = await command(['simctl', 'create', `RHLayout-${process.pid}`, type.identifier, runtime.identifier]);
     assert.match(device, /^[A-F0-9-]{36}$/i);
     await command(['simctl', 'boot', device]);

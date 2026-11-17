@@ -173,4 +173,5 @@ jobs:
         with:
           name: UIKit_layout_evidence
           path: .audit-artifacts/preferences-ui/
+          include-hidden-files: true
           if-no-files-found: ignore
