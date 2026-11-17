@@ -44,7 +44,7 @@
     "homeRefresh": "Rebuild when home is visible; no window replacement during expanded jailbreak or on top of a presented license alert."
   },
   "workflow": {
-    "status": "configured, not dispatched; YAML inspected but actionlint unavailable locally"
+    "status": "uploaded to kulinichx/DopamineGlass; initial Actions runs completed; simulator cold-start retry pending"
   },
   "dependencyPins": {
     "status": "unchanged",
@@ -64,7 +64,23 @@
   },
   "nativeAuthorizationChecks": {
     "status": "configured, not run on Windows",
-    "foundation": "production theme selection with mocked license validity",
+    "foundation": "passed on GitHub macOS runner with mocked license validity; not Secure Enclave/device verification",
     "uikit": "13 authorization/selection and revocation/restoration checks; synthetic Preferences parent"
+  },
+  "cloudValidation": {
+    "repository": "kulinichx/DopamineGlass",
+    "branch": "rc9-glass-authorization",
+    "initialCommit": "f4f31bca8232328d280c3a484ded2f8c257cbe5e",
+    "dispatchRun": 44076200542,
+    "pushRun": 44076126835,
+    "macosTests": {
+      "tests": 108,
+      "pass": 107,
+      "fail": 0,
+      "skipped": 1
+    },
+    "foundation": "passed production media transaction, blur scheduling and theme/authorization selection tests",
+    "uikit": "initial simctl runtime enumeration timed out at 60 seconds before compilation; bounded 240-second cold-start allowance added; retry pending",
+    "fullBuild": "initial push run failed at recursive checkout: locked ChOma commit not our ref; no IPA/TIPA produced"
   }
 }

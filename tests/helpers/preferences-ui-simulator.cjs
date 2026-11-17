@@ -41,19 +41,21 @@ async function run() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-uikit-'));
   const output = path.join(root, '.audit-artifacts/preferences-ui');
   fs.mkdirSync(output, { recursive: true });
-  const command = async (args, timeout = 60000) => {
+  const command = async (args, timeout = 90000) => {
     console.log('[UIKit]', args.join(' '));
     try {
       const { stdout } = await execFileAsync('xcrun', args, { encoding: 'utf8', timeout, maxBuffer: 8 * 1024 * 1024 });
       return stdout.trim();
     } catch (error) {
-      fs.appendFileSync(path.join(output, 'commands.log'), `${args.join(' ')}\n${error.stdout || ''}\n${error.stderr || ''}\n${error.message}\n`);
+      fs.appendFileSync(path.join(output, 'commands.log'), `${args.join(' ')}\n${error.stdout || ''}\n${error.stderr || ''}\n${error.message}\n${JSON.stringify({ timeout, killed: error.killed, signal: error.signal, code: error.code })}\n`);
       throw error;
     }
   };
   let device;
   try {
-    const runtimes = JSON.parse(await command(['simctl', 'list', 'runtimes', '-j'])).runtimes;
+    // CoreSimulator's first service start on a fresh hosted runner can exceed a minute.
+    // Keep a bounded cold-start allowance; a timeout still fails the native check.
+    const runtimes = JSON.parse(await command(['simctl', 'list', 'runtimes', '-j'], 240000)).runtimes;
     const runtime = runtimes.find(item => item.isAvailable && item.identifier.includes('.iOS-') &&
       (!process.env.DORH_SIMULATOR_RUNTIME || item.version === process.env.DORH_SIMULATOR_RUNTIME));
     assert.ok(runtime, 'No available iOS Simulator runtime; UIKit check cannot be replaced with source checks.');

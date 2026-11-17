@@ -66,15 +66,15 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
   node --test --test-name-pattern='UIKit simulator exercises' tests/glass-ui-contracts.test.cjs
 ```
 
-工作流 `../.github/workflows/main.yml` 已修正为检出当前仓库，而不是硬编码下载另一份官方仓库。`port-tests` 可独立运行 macOS 回归，不需要下载底层子模块；手动执行工作流时还要求 `uikit-layout` 通过，再进入完整构建。工作流已配置但本轮没有推送、启动云端作业或上传发布物。
+工作流 `../.github/workflows/main.yml` 已修正为检出当前仓库，而不是硬编码下载另一份官方仓库。`port-tests` 可独立运行 macOS 回归，不需要下载底层子模块；手动执行工作流时还要求 `uikit-layout` 通过，再进入完整构建。用户确认后已推送至 `kulinichx/DopamineGlass` 的 `rc9-glass-authorization` 分支，并启动 Actions；没有发布 Release。初次 macOS 回归 108 项中 107 通过、0 失败、1 项 UIKit 按入口跳过。单独 UIKit 作业在 CoreSimulator 冷启动枚举时超过原 60 秒上限，尚未进入界面编译；已添加有界冷启动等待后重跑。详见 `RC9-VALIDATION.json`。
 
 ## 当前构建限制
 
-本机为 Windows，没有 Xcode/iOS SDK。完整 App、UIKit 模拟器和 Secure Enclave 真机验证均未执行。
+本机为 Windows，没有 Xcode/iOS SDK。云端已运行 macOS/Foundation 回归；完整 App 尚未构建成功，UIKit 模拟器验证仍待重跑，Secure Enclave 真机验证未执行。
 
 补齐依赖时，`BaseBin/ChOma` 锁定提交 `4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6` 无法从上游配置的 `opa334/ChOma` 仓库取得，Git 报 `not our ref`。已把未完成检出恢复为未初始化状态，**没有使用 main 或更改 gitlink**；其余顶层可用子模块按原锁定提交检出，XPF 嵌套依赖尚未全部初始化。
 
-此问题同样可能阻断云端完整构建。应从可信已有缓存恢复该精确对象，或由上游明确修复/确认依赖；不能为了打包而偷偷换依赖。这个阻碍不影响已完成的源码检查，但源码检查通过不能证明可安装包可用。
+首次推送的云端完整构建已在递归检出时被此问题阻断（`not our ref`）。应从可信已有缓存恢复该精确对象，或由上游明确修复/确认依赖；不能为了打包而偷偷换依赖。这个阻碍不影响已完成的源码检查，但源码检查通过不能证明可安装包可用。
 
 ## 以后跟随上游升级
 
@@ -85,4 +85,4 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
 5. 运行回归、macOS 原生构建、包内权限/资源检查、模拟器布局和真机授权/越狱验收。
 6. 真机至少覆盖：未授权仍可使用原越狱；合法旧/新授权、错误设备/无效码、撤销失败；头像/静态和动态壁纸；前后台、重新加载、重启；原 ZQBB 主题、备用图标、设置、包管理器和原支持范围。
 
-源码变更仍留在本地功能分支的工作区中，没有自动提交、推送、发布或设置自动升级。
+源码已按用户请求提交并推送至其 GitHub 仓库以执行构建。没有发布安装包或设置自动升级；后续构建记录须继续区分源码回归、原生 UIKit 验证和完整 App 打包结果。
