@@ -66,11 +66,11 @@ DORH_RUN_UIKIT_SIMULATOR=1 DORH_SIMULATOR_RUNTIME=18.5 \
   node --test --test-name-pattern='UIKit simulator exercises' tests/glass-ui-contracts.test.cjs
 ```
 
-工作流 `../.github/workflows/main.yml` 已修正为检出当前仓库，而不是硬编码下载另一份官方仓库。`port-tests` 可独立运行 macOS 回归，不需要下载底层子模块；手动执行工作流时还要求 `uikit-layout` 通过，再进入完整构建。用户确认后已推送至 `kulinichx/DopamineGlass` 的 `rc9-glass-authorization` 分支，并启动 Actions；没有发布 Release。初次 macOS 回归 108 项中 107 通过、0 失败、1 项 UIKit 按入口跳过。单独 UIKit 作业在调整冷启动等待后，已通过 Xcode 16.4 / iOS Simulator 18.5 原生编译；随后首次启动数据迁移超过原 180 秒上限，尚未进入界面断言。已增加有界首次启动等待后重跑；不能把编译通过当作布局测试通过。详见 `RC9-VALIDATION.json`。
+工作流 `../.github/workflows/main.yml` 已修正为检出当前仓库，而不是硬编码下载另一份官方仓库。`port-tests` 可独立运行 macOS 回归，不需要下载底层子模块；手动执行工作流时还要求 `uikit-layout` 通过，再进入完整构建。用户确认后已推送至 `kulinichx/DopamineGlass` 的 `rc9-glass-authorization` 分支，并启动 Actions；没有发布 Release。初次 macOS 回归 108 项中 107 通过、0 失败、1 项 UIKit 按入口跳过。单独 UIKit 作业在调整冷启动等待后，已通过 Xcode 16.4 / iOS Simulator 18.5 原生编译；增加有界首次启动等待后，运行 `44080329731` 已完成模拟器启动，但 `simctl install` 在 120 秒超时，仍未进入界面断言。诊断已保存，不继续无依据地延长超时或跳过检查；不能把编译通过当作布局测试通过。详见 `RC9-VALIDATION.json`。
 
 ## 当前构建限制
 
-本机为 Windows，没有 Xcode/iOS SDK。云端已运行 macOS/Foundation 回归；完整 App 尚未构建成功，UIKit 模拟器验证仍待重跑，Secure Enclave 真机验证未执行。
+本机为 Windows，没有 Xcode/iOS SDK。云端已运行 macOS/Foundation 回归；完整 App 尚未构建成功，UIKit 程序编译通过但安装超时，运行验证未完成，Secure Enclave 真机验证未执行。
 
 补齐依赖时，`BaseBin/ChOma` 锁定提交 `4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6` 无法从上游配置的 `opa334/ChOma` 仓库取得，Git 报 `not our ref`。已把未完成检出恢复为未初始化状态，**没有使用 main 或更改 gitlink**；其余顶层可用子模块按原锁定提交检出，XPF 嵌套依赖尚未全部初始化。
 

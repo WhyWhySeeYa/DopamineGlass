@@ -29,8 +29,8 @@
     "duplicateLocaleKeys": "none in en, zh-CN, zh-Hans"
   },
   "nativeBuild": {
-    "status": "not run",
-    "reason": "Windows host; exact upstream ChOma pin unavailable"
+    "status": "failed before App compilation",
+    "reason": "GitHub push run 44076126835 recursive checkout failed: exact ChOma pin 4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6 not our ref; no IPA/TIPA produced"
   },
   "deviceValidation": {
     "status": "not run"
@@ -44,7 +44,7 @@
     "homeRefresh": "Rebuild when home is visible; no window replacement during expanded jailbreak or on top of a presented license alert."
   },
   "workflow": {
-    "status": "uploaded to kulinichx/DopamineGlass; initial Actions runs completed; simulator cold-start retry pending"
+    "status": "uploaded and dispatched; macOS regression passed; UIKit execution blocked by hosted simulator install timeout; no Release published"
   },
   "dependencyPins": {
     "status": "unchanged",
@@ -63,9 +63,9 @@
     "actualGitObjects": "not modified; isolated temporary object directory"
   },
   "nativeAuthorizationChecks": {
-    "status": "configured, not run on Windows",
+    "status": "Foundation policy tests passed in GitHub macOS CI; UIKit runtime and real-device checks not completed",
     "foundation": "passed on GitHub macOS runner with mocked license validity; not Secure Enclave/device verification",
-    "uikit": "13 authorization/selection and revocation/restoration checks; synthetic Preferences parent"
+    "uikit": "Native harness compilation passed; 13 authorization/selection checks were not executed because simulator installation timed out"
   },
   "cloudValidation": {
     "repository": "kulinichx/DopamineGlass",
@@ -80,13 +80,15 @@
       "skipped": 1
     },
     "foundation": "passed production media transaction, blur scheduling and theme/authorization selection tests",
-    "uikit": "Run 44078794467: production UIKit harness compiled with Xcode 16.4/iOS Simulator 18.5 x86_64; bootstatus exceeded 180 seconds in first-boot data migration before app launch; bounded 420-second boot retry pending.",
+    "uikit": "Run 44080329731: native compilation passed; iOS 18.5 simulator boot completed within extended allowance; simctl install timed out after 120 seconds before app launch. No runtime layout or authorization boundary assertion result. Diagnostics downloaded locally.",
     "fullBuild": "initial push run failed at recursive checkout: locked ChOma commit not our ref; no IPA/TIPA produced",
     "nativeUIKitCompilation": {
       "status": "passed",
       "run": 44078794467,
       "scope": "production material and layout snippets with synthetic Preferences parent; not full App build"
     },
-    "runner": "macos-15-intel for Foundation/UIKit jobs; full build keeps upstream runner"
+    "runner": "macos-15-intel for Foundation/UIKit jobs; full build keeps upstream runner",
+    "latestSourceCommit": "8cc3532",
+    "latestDispatchRun": 44080329731
   }
 }
