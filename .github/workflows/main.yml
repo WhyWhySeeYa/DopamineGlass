@@ -135,7 +135,7 @@ jobs:
           archive: false
 
   port-tests:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -152,7 +152,7 @@ jobs:
 
   uikit-layout:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
