@@ -23,7 +23,12 @@ function prepare(root, work) {
   // Drop obsolete target objects/proxies so linked frameworks are ordinary prebuilt file references.
   for (const [id, o] of Object.entries(objects)) {
     if ((o.isa === 'PBXNativeTarget' && id !== targetID) ||
-        o.isa === 'PBXTargetDependency' || o.isa === 'PBXContainerItemProxy') delete objects[id];
+        o.isa === 'PBXTargetDependency' || o.isa === 'PBXContainerItemProxy' ||
+        o.isa === 'PBXFileSystemSynchronizedBuildFileExceptionSet') delete objects[id];
+    if (o.isa === 'PBXFileSystemSynchronizedRootGroup') {
+      o.isa='PBXGroup'; o.children=[];
+      delete o.exceptions; delete o.explicitFileTypes; delete o.explicitFolders;
+    }
   }
   if (main.attributes?.TargetAttributes)
     main.attributes.TargetAttributes = {[targetID]: main.attributes.TargetAttributes[targetID] || {}};

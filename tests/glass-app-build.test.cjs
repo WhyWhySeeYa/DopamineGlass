@@ -19,7 +19,7 @@ test('disposable App project preserves tracked source, trims core targets, redir
  const actual=Object.values(p.objects).find(o=>o.isa==='PBXNativeTarget'&&o.name==='Dopamine');
  assert.deepEqual(actual.dependencies,[]);
  assert.equal(Object.values(p.objects).filter(o=>o.isa==='PBXNativeTarget').length,1);
- assert.equal(Object.values(p.objects).filter(o=>['PBXTargetDependency','PBXContainerItemProxy'].includes(o.isa)).length,0);
+ assert.equal(Object.values(p.objects).filter(o=>['PBXTargetDependency','PBXContainerItemProxy','PBXFileSystemSynchronizedBuildFileExceptionSet','PBXFileSystemSynchronizedRootGroup'].includes(o.isa)).length,0);
  assert.equal(p.objects[p.rootObject].targets.length,1);
  const sources=t=>t.buildPhases.filter(id=>original.objects[id].isa==='PBXSourcesBuildPhase').map(id=>original.objects[id].files);
  assert.deepEqual(sources(actual),sources(target));
