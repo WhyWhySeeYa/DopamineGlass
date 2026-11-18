@@ -100,7 +100,7 @@ DORHSupporterReadHardwareECID(NSString **source, NSString **failureStage,
     // The device-tree property is exactly 8 bytes in little-endian order.
     // Never substitute IDFV, serial number, a random value, or cached input.
     io_registry_entry_t chosen = IORegistryEntryFromPath(
-        kIOMasterPortDefault, "IODeviceTree:/chosen");
+        kIOMainPortDefault, "IODeviceTree:/chosen");
     NSString *registryFailure = @"ioreg-node";
     NSInteger registryCode = -2;
     if (chosen != IO_OBJECT_NULL) {

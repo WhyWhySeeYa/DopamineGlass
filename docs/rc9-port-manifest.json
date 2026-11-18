@@ -26,7 +26,7 @@
       },
       "Application/Dopamine/UI/DOSupporterLicense.h": {
         "sourceSha256": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
-        "adaptedSha256": "c26ca2900106222463e4e2f9d0cc25c951ab80b3a617044deb542c6ace9217b0",
+        "adaptedSha256": "6856959d94431bd4b928680df314f9d5a91b570f25ec2a2fd9e7720bf561a200",
         "reason": "Keep the Custom Glass rh-hw-v1 ECID hash and authorization protocols unchanged; add device-tree access to the same ECID when MobileGestalt withholds it, with non-identifying failure diagnostics."
       },
       "Application/Dopamine/UI/DOSupporterLicenseUI.h": {

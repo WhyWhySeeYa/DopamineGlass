@@ -108,8 +108,8 @@ test('native Foundation executes hardware identity fallback, canonical hashes an
     fs.writeFileSync(file, `#import <Foundation/Foundation.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <IOKit/IOKitLib.h>
-#undef kIOMasterPortDefault
-#define kIOMasterPortDefault 0
+#undef kIOMainPortDefault
+#define kIOMainPortDefault 0
 #define IORegistryEntryFromPath TestIORegistryEntryFromPath
 #define IORegistryEntryCreateCFProperty TestIORegistryEntryCreateCFProperty
 #define IOObjectRelease TestIOObjectRelease
