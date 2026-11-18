@@ -107,9 +107,12 @@ test('native Foundation executes hardware identity fallback, canonical hashes an
     const file = path.join(directory, 'main.m');
     fs.writeFileSync(file, `#import <Foundation/Foundation.h>
 #import <CommonCrypto/CommonDigest.h>
-typedef unsigned int io_registry_entry_t;
+#import <IOKit/IOKitLib.h>
+#undef kIOMasterPortDefault
 #define kIOMasterPortDefault 0
-#define IO_OBJECT_NULL 0
+#define IORegistryEntryFromPath TestIORegistryEntryFromPath
+#define IORegistryEntryCreateCFProperty TestIORegistryEntryCreateCFProperty
+#define IOObjectRelease TestIOObjectRelease
 static id gestaltAnswer, registryAnswer;
 static BOOL registryNode = YES;
 static NSUInteger registryReads, nodeReleases;
@@ -127,7 +130,7 @@ static CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t node, CFStr
 }
 static int IOObjectRelease(io_registry_entry_t node) { if (node != 42) abort(); nodeReleases++; return 0; }
 ${production}
-#define CHECK(x) do { if (!(x)) abort(); } while (0)
+#define CHECK(x) do { if (!(x)) { fprintf(stderr, "Hardware test failed at line %d\\n", __LINE__); abort(); } } while (0)
 int main(void) { @autoreleasepool {
   unsigned char bytes[] = {0xEF, 0xCD, 0xAB, 0x89, 0x67, 0x45, 0x23, 0x01};
   NSData *valid = [NSData dataWithBytes:bytes length:8];
