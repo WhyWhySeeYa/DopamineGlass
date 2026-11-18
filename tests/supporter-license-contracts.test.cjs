@@ -72,7 +72,7 @@ function objcMethod(sourceText, signature) {
 }
 
 test('hardware identity fallback reads only the same ECID and retains actionable failure stages', () => {
-  const readECID = body('DORHSupporterReadHardwareECID');
+  const readECID = body('DORHSupporterReadHardwareECIDDirect');
   assert.ok(readECID.indexOf('MGCopyAnswer') < readECID.indexOf('IORegistryEntryFromPath'));
   assert.match(readECID, /IODeviceTree:\/chosen/);
   assert.match(readECID, /CFSTR\("unique-chip-id"\)/);
@@ -116,9 +116,43 @@ test('native Foundation executes hardware identity fallback, canonical hashes an
 static id gestaltAnswer, registryAnswer;
 static BOOL registryNode = YES;
 static NSUInteger registryReads, nodeReleases;
+static BOOL installedThroughTrollStore = YES, jailbreakActive, allowRoot;
+static BOOL rootScope, unsandboxedScope;
+static NSUInteger rootAttempts, unsandboxedAttempts;
+static id privilegedGestaltAnswer, privilegedRegistryAnswer;
+@interface DOEnvironmentManager : NSObject
++ (instancetype)sharedManager;
+- (BOOL)isJailbroken;
+- (BOOL)isInstalledThroughTrollStore;
+- (void)runAsRoot:(void (^)(void))block;
+- (void)runUnsandboxed:(void (^)(void))block;
+@end
+@implementation DOEnvironmentManager
++ (instancetype)sharedManager {
+  static DOEnvironmentManager *environment;
+  if (!environment) environment = [DOEnvironmentManager new];
+  return environment;
+}
+- (BOOL)isJailbroken { return jailbreakActive; }
+- (BOOL)isInstalledThroughTrollStore { return installedThroughTrollStore; }
+- (void)runAsRoot:(void (^)(void))block {
+  rootAttempts++;
+  if (!jailbreakActive || installedThroughTrollStore || rootScope) abort();
+  if (!allowRoot) return;
+  rootScope = YES;
+  @try { block(); } @finally { rootScope = NO; }
+}
+- (void)runUnsandboxed:(void (^)(void))block {
+  unsandboxedAttempts++;
+  if (!rootScope || unsandboxedScope) abort();
+  unsandboxedScope = YES;
+  @try { block(); } @finally { unsandboxedScope = NO; }
+}
+@end
 static CFPropertyListRef MGCopyAnswer(CFStringRef key) {
   if (![(__bridge NSString *)key isEqualToString:@"UniqueChipID"]) abort();
-  return gestaltAnswer ? CFRetain((__bridge CFTypeRef)gestaltAnswer) : NULL;
+  id answer = rootScope && unsandboxedScope ? privilegedGestaltAnswer : gestaltAnswer;
+  return answer ? CFRetain((__bridge CFTypeRef)answer) : NULL;
 }
 static io_registry_entry_t IORegistryEntryFromPath(unsigned int port, const char *path) {
   if (port != 0 || strcmp(path, "IODeviceTree:/chosen")) abort();
@@ -126,7 +160,8 @@ static io_registry_entry_t IORegistryEntryFromPath(unsigned int port, const char
 }
 static CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t node, CFStringRef key, CFAllocatorRef allocator, unsigned int options) {
   if (node != 42 || options != 0 || ![(__bridge NSString *)key isEqualToString:@"unique-chip-id"]) abort();
-  return registryAnswer ? CFRetain((__bridge CFTypeRef)registryAnswer) : NULL;
+  id answer = rootScope && unsandboxedScope ? privilegedRegistryAnswer : registryAnswer;
+  return answer ? CFRetain((__bridge CFTypeRef)answer) : NULL;
 }
 static int IOObjectRelease(io_registry_entry_t node) { if (node != 42) abort(); nodeReleases++; return 0; }
 ${production}
@@ -174,6 +209,55 @@ int main(void) { @autoreleasepool {
   hardware = DORHSupporterHardwareIdentityProbe();
   CHECK([hardware[@"stage"] isEqual:@"hardware-identity/mg-missing/ioreg-node"]);
   CHECK([hardware[@"error_code"] integerValue] == -2);
+  CHECK(rootAttempts == 0 && unsandboxedAttempts == 0);
+  // A signed App with ordinary access still uses RC9's original identity,
+  // whether or not a jailbreak is active. No privilege change is necessary.
+  installedThroughTrollStore = NO; registryNode = YES; registryAnswer = nil;
+  gestaltAnswer = @0x0123456789ABCDEFULL;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK([hardware[@"hardware_hash"] isEqual:expected]);
+  CHECK(rootAttempts == 0);
+  gestaltAnswer = nil;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK(![hardware[@"available"] boolValue]);
+  CHECK([hardware[@"stage"] isEqual:@"hardware-identity/signed-jailbreak/inactive"]);
+  CHECK([hardware[@"error_code"] integerValue] == -8 && rootAttempts == 0);
+  // Do not cache the failure: activating the existing upstream environment
+  // allows the next attempt. Denied root access must still fail closed.
+  jailbreakActive = YES;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK(![hardware[@"available"] boolValue]);
+  CHECK([hardware[@"stage"] isEqual:@"hardware-identity/signed-jailbreak/root-unavailable"]);
+  CHECK([hardware[@"error_code"] integerValue] == -7);
+  CHECK(rootAttempts == 1 && unsandboxedAttempts == 0);
+  allowRoot = YES; privilegedRegistryAnswer = valid;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK([hardware[@"hardware_hash"] isEqual:expected]);
+  CHECK([hardware[@"hardware_id"] isEqual:expectedID]);
+  CHECK([hardware[@"source"] isEqual:@"device-tree-jailbreak"]);
+  CHECK(!rootScope && !unsandboxedScope);
+  CHECK(rootAttempts == 2 && unsandboxedAttempts == 1);
+  // Output pointers are optional and successful retries clear prior errors.
+  NSString *readSource = @"stale", *readStage = @"stale"; NSInteger readCode = -99;
+  CHECK(DORHSupporterReadHardwareECID(&readSource, &readStage, &readCode) == 0x0123456789ABCDEFULL);
+  CHECK(readStage == nil && readCode == 0);
+  CHECK(DORHSupporterReadHardwareECID(NULL, NULL, NULL) == 0x0123456789ABCDEFULL);
+  privilegedGestaltAnswer = @0xFEDCBA9876543210ULL;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK([hardware[@"hardware_hash"] isEqual:@"${expectedHash('FEDCBA9876543210')}"]);
+  CHECK([hardware[@"source"] isEqual:@"mobilegestalt-jailbreak"]);
+  CHECK(!rootScope && !unsandboxedScope);
+  privilegedGestaltAnswer = nil; privilegedRegistryAnswer = nil;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK(![hardware[@"available"] boolValue]);
+  CHECK([hardware[@"hardware_hash"] length] == 0);
+  CHECK([hardware[@"stage"] isEqual:@"hardware-identity/mg-missing/ioreg-property/signed-retry"]);
+  CHECK([hardware[@"error_code"] integerValue] == -3);
+  CHECK(!rootScope && !unsandboxedScope);
+  NSUInteger attempts = rootAttempts; installedThroughTrollStore = YES;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK(![hardware[@"available"] boolValue] && rootAttempts == attempts);
+  CHECK([hardware[@"stage"] isEqual:@"hardware-identity/mg-missing/ioreg-property"]);
   return 0;
 } }
 `);

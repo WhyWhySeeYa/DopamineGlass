@@ -11,6 +11,7 @@
 #import <CommonCrypto/CommonDigest.h>
 #import <objc/runtime.h>
 #import <IOKit/IOKitLib.h>
+#import "DOEnvironmentManager.h"
 
 CFPropertyListRef MGCopyAnswer(CFStringRef property);
 
@@ -72,7 +73,7 @@ static inline NSError *DORHSupporterLicenseError(NSInteger code, NSString *descr
 // installation path, and iOS version.
 //
 static inline unsigned long long
-DORHSupporterReadHardwareECID(NSString **source, NSString **failureStage,
+DORHSupporterReadHardwareECIDDirect(NSString **source, NSString **failureStage,
                              NSInteger *failureCode)
 {
     if (source) *source = nil;
@@ -134,6 +135,53 @@ DORHSupporterReadHardwareECID(NSString **source, NSString **failureStage,
     if (failureStage) *failureStage = [NSString stringWithFormat:
         @"hardware-identity/%@/%@", gestaltFailure, registryFailure];
     if (failureCode) *failureCode = registryCode;
+    return 0;
+}
+
+static inline unsigned long long
+DORHSupporterReadHardwareECID(NSString **source, NSString **failureStage,
+                             NSInteger *failureCode)
+{
+    unsigned long long ecid = DORHSupporterReadHardwareECIDDirect(
+        source, failureStage, failureCode);
+    if (ecid != 0) return ecid;
+
+    // A signed installation does not necessarily retain the IPA's private
+    // entitlements. Use the upstream temporary access mechanism only after
+    // ordinary access fails and this Dopamine jailbreak is already active.
+    // Keep hashing, Secure Enclave keys and all license operations outside
+    // this scope; read the same physical ECID and restore access immediately.
+    DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
+    if ([environment isInstalledThroughTrollStore])
+        return 0;
+    if (![environment isJailbroken]) {
+        if (failureStage) *failureStage = @"hardware-identity/signed-jailbreak/inactive";
+        if (failureCode) *failureCode = -8;
+        return 0;
+    }
+
+    __block unsigned long long retryECID = 0;
+    __block NSString *retrySource = nil;
+    __block NSString *retryStage = nil;
+    __block NSInteger retryCode = -7;
+    __block BOOL attempted = NO;
+    [environment runAsRoot:^{
+        [environment runUnsandboxed:^{
+            attempted = YES;
+            retryECID = DORHSupporterReadHardwareECIDDirect(
+                &retrySource, &retryStage, &retryCode);
+        }];
+    }];
+    if (retryECID != 0) {
+        if (source) *source = [retrySource stringByAppendingString:@"-jailbreak"];
+        if (failureStage) *failureStage = nil;
+        if (failureCode) *failureCode = 0;
+        return retryECID;
+    }
+    if (failureStage) *failureStage = attempted
+        ? [(retryStage ?: @"hardware-identity") stringByAppendingString:@"/signed-retry"]
+        : @"hardware-identity/signed-jailbreak/root-unavailable";
+    if (failureCode) *failureCode = retryCode;
     return 0;
 }
 

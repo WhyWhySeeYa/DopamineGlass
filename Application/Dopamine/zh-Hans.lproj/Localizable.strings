@@ -173,6 +173,7 @@
 "Supporter_Device_Proof_Ready" = "证明已生成并复制";
 "Supporter_Device_Proof_Ready_Message" = "请粘贴发给作者。";
 "Supporter_Device_Proof_Failed" = "设备证明生成失败";
+"Supporter_Proof_Requires_Jailbreak" = "当前安装方式在越狱前无法读取设备身份。请先在首页完成越狱，重新打开本应用，再复制验证文本并执行第 2 步。已有授权无需删除。";
 "Supporter_Device_Proof_Failed_Format" = "无法生成设备证明。\n\n阶段\n%@\n\n错误代码\n%ld";
 "Supporter_Activated" = "支持者授权已启用";
 "Supporter_Activated_Message" = "授权已保存。立即应用以刷新界面。";

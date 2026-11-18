@@ -26,13 +26,13 @@
       },
       "Application/Dopamine/UI/DOSupporterLicense.h": {
         "sourceSha256": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
-        "adaptedSha256": "6856959d94431bd4b928680df314f9d5a91b570f25ec2a2fd9e7720bf561a200",
-        "reason": "Keep the Custom Glass rh-hw-v1 ECID hash and authorization protocols unchanged; add device-tree access to the same ECID when MobileGestalt withholds it, with non-identifying failure diagnostics."
+        "adaptedSha256": "71e437971a3c1b090451a66e2552c5a52df7d83cf4021b1370471ed66801fc4e",
+        "reason": "Custom Glass authorization: Preserve RC9 ECID identity and frozen license operations; retry a denied read using the existing ZQBB temporary root/unsandboxed scope only for an already-active signed-install jailbreak."
       },
       "Application/Dopamine/UI/DOSupporterLicenseUI.h": {
         "sourceSha256": "0c88f214d7ac30e9356f7ecb96cfbf99ec7db46660a9f82c062913af9d776d85",
-        "adaptedSha256": "990e8465d4b78c2fb92270c93779f1f1b09df7bff0af81c8a2af50a0dfd4c174",
-        "reason": "Show non-identifying hardware reader failure stages in Custom Glass authorization diagnostics."
+        "adaptedSha256": "a95cecb277201d410ef4593d605c99a9998817f0e537301c356714dde3a3ba96",
+        "reason": "Custom Glass authorization: Show hardware-reader diagnostics and explain when a signed installation must complete the upstream jailbreak before generating a proof."
       }
     }
   },

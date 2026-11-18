@@ -178,6 +178,7 @@
 "Supporter_Device_Proof_Ready" = "Proof Generated and Copied";
 "Supporter_Device_Proof_Ready_Message" = "Paste and send it to the author.";
 "Supporter_Device_Proof_Failed" = "Device Proof Failed";
+"Supporter_Proof_Requires_Jailbreak" = "This installation cannot read the device identity before jailbreaking. Complete the jailbreak from the home screen, reopen this app, then copy the verification text and try step 2 again. Keep your existing license.";
 "Supporter_Device_Proof_Failed_Format" = "Unable to create a device proof.\n\nStage\n%@\n\nError Code\n%ld";
 "Supporter_Activated" = "Supporter Activated";
 "Supporter_Activated_Message" = "The license is saved. Apply it now to refresh the interface.";

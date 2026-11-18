@@ -132,6 +132,9 @@ static inline void DORHPresentSupporterLicense(UIViewController *presenter)
             NSString *failure = [NSString stringWithFormat:
                 DOLocalizedString(@"Supporter_Device_Proof_Failed_Format"),
                 failureStage ?: @"unknown", (long)failureCode];
+            if ([failureStage isEqualToString:@"hardware-identity/signed-jailbreak/inactive"]) {
+                failure = DOLocalizedString(@"Supporter_Proof_Requires_Jailbreak");
+            }
             DORHShowSupporterMessage(weakPresenter,
                 DOLocalizedString(@"Supporter_Device_Proof_Failed"), failure);
             return;
