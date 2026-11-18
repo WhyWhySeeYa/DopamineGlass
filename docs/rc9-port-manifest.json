@@ -16,8 +16,6 @@
       "Application/Dopamine/UI/DOCustomGlassThemeSync.h": "2fd14c17cbc326b90f64033af7faf065f964223940abea346d28fa10291c3657",
       "Application/Dopamine/UI/DOCustomGlassView.h": "dc2169ba87404ce212422d4dd65298798443fc721a24d9c856f5474c22ae19e8",
       "Application/Dopamine/UI/DOSupporterBinding.h": "24f96a7e617d6b0f9024cd2c04311d3a2944d93033399e4527fec5801b03ffa6",
-      "Application/Dopamine/UI/DOSupporterLicense.h": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
-      "Application/Dopamine/UI/DOSupporterLicenseUI.h": "0c88f214d7ac30e9356f7ecb96cfbf99ec7db46660a9f82c062913af9d776d85",
       "Application/Dopamine/UI/DOSupporterRenderAuthorization.h": "520c79ee9dd132f552284447cea98740d7ac2f1593e90038cc63b86e9acaee12"
     },
     "runtimeAdaptations": {
@@ -25,6 +23,16 @@
         "sourceSha256": "3b10886527061f217b0ab015274309680c0de662b80732865ef2637c90a37108",
         "adaptedSha256": "26bb43f61c59f35c930c9e92c375accbb9f87d516e5bea1d2571be276d1e0885",
         "reason": "Render glass only for an authorized, explicitly selected custom_glass theme; otherwise use the upstream stock UI path."
+      },
+      "Application/Dopamine/UI/DOSupporterLicense.h": {
+        "sourceSha256": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
+        "adaptedSha256": "c26ca2900106222463e4e2f9d0cc25c951ab80b3a617044deb542c6ace9217b0",
+        "reason": "Keep the Custom Glass rh-hw-v1 ECID hash and authorization protocols unchanged; add device-tree access to the same ECID when MobileGestalt withholds it, with non-identifying failure diagnostics."
+      },
+      "Application/Dopamine/UI/DOSupporterLicenseUI.h": {
+        "sourceSha256": "0c88f214d7ac30e9356f7ecb96cfbf99ec7db46660a9f82c062913af9d776d85",
+        "adaptedSha256": "990e8465d4b78c2fb92270c93779f1f1b09df7bff0af81c8a2af50a0dfd4c174",
+        "reason": "Show non-identifying hardware reader failure stages in Custom Glass authorization diagnostics."
       }
     }
   },

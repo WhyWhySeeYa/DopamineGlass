@@ -151,5 +151,29 @@
     "localVerification": "Artifact ZIP digest matches GitHub; IPA/TIPA digests match build report; no zebra.deb; manager list equals original minus exactly Zebra; original Sileo bytes and all 46 preserved file SHA256 match; Mach-O arm64 iOS15, no linked runner-absolute library paths",
     "localOutput": "../builds/44097054652",
     "deviceValidation": "not run"
+  },
+  "hardwareIdentityFollowup": {
+    "date": "2026-11-18",
+    "reportedBuild": "fbc4534 / TEST-7",
+    "deviceFeedback": {
+      "stockReturn": "working",
+      "proof": "still fails hardware-identity / -1"
+    },
+    "signedIPAInspection": "Direct Mach-O entitlement extraction confirmed UniqueChipID allowed key in fbc4534 IPA",
+    "change": "Same ECID from chosen device-tree property if MobileGestalt fails; strict 8-byte little-endian decoder; preserve rh-hw-v1 and frozen license operations; expose non-identifying stage/code",
+    "localNodeTests": {
+      "tests": 115,
+      "pass": 108,
+      "fail": 0,
+      "skipped": 7
+    },
+    "pythonArchiveTests": {
+      "tests": 10,
+      "pass": 10,
+      "fail": 0
+    },
+    "upstreamChecks": 13,
+    "macOSNativeTest": "pending cloud run; OS interfaces mocked, production reader and hash execute",
+    "deviceValidation": "pending new candidate install"
   }
 }

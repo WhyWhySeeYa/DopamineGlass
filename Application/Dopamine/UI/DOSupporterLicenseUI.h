@@ -53,7 +53,10 @@ static inline void DORHPresentSupporterDiagnostics(UIViewController *presenter)
 
         NSString *hardwareStatus = [hardware[@"available"] boolValue]
             ? DOLocalizedString(@"Supporter_Diagnostics_Available")
-            : DOLocalizedString(@"Supporter_Diagnostics_Unavailable");
+            : [NSString stringWithFormat:@"%@ (%@, %@)",
+                DOLocalizedString(@"Supporter_Diagnostics_Unavailable"),
+                hardware[@"stage"] ?: @"hardware-identity",
+                hardware[@"error_code"] ?: @(-1)];
         NSString *keyStatus = [key[@"available"] boolValue]
             ? DOLocalizedString(@"Supporter_Diagnostics_Available")
             : DOLocalizedString(@"Supporter_Diagnostics_Unavailable");

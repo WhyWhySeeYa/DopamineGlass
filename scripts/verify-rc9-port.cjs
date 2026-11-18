@@ -171,7 +171,7 @@ const checks = {
       assert.ok(frameworkPaths.some(file => file.endsWith('/' + name + '.framework')), name);
     assert.doesNotMatch(read(projectPath), /DOLowPowerScheduleController/);
   },
-  'license protocol, public verifier and RC9 media storage are imported without modification'() {
+  'RC9 imports and reviewed glass authorization adaptations match their recorded hashes'() {
     for (const [file, hash] of Object.entries(manifest.rc9.unchangedRuntimeFiles))
       assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex'), hash, file);
     for (const [file, adaptation] of Object.entries(manifest.rc9.runtimeAdaptations)) {

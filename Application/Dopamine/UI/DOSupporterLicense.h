@@ -10,6 +10,7 @@
 @import Security;
 #import <CommonCrypto/CommonDigest.h>
 #import <objc/runtime.h>
+#import <IOKit/IOKitLib.h>
 
 CFPropertyListRef MGCopyAnswer(CFStringRef property);
 
@@ -70,45 +71,88 @@ static inline NSError *DORHSupporterLicenseError(NSInteger code, NSString *descr
 // The protocol is independent of App version, Bundle ID, IDFV,
 // installation path, and iOS version.
 //
+static inline unsigned long long
+DORHSupporterReadHardwareECID(NSString **source, NSString **failureStage,
+                             NSInteger *failureCode)
+{
+    if (source) *source = nil;
+    if (failureStage) *failureStage = nil;
+    if (failureCode) *failureCode = 0;
+
+    CFPropertyListRef answer = MGCopyAnswer(CFSTR("UniqueChipID"));
+    unsigned long long ecid = 0;
+    NSString *gestaltFailure = @"mg-missing";
+    if (answer) {
+        gestaltFailure = @"mg-type";
+        if (CFGetTypeID(answer) == CFNumberGetTypeID() &&
+            !CFNumberIsFloatType((CFNumberRef)answer)) {
+            ecid = [(__bridge NSNumber *)answer unsignedLongLongValue];
+            gestaltFailure = @"mg-zero";
+        }
+        CFRelease(answer);
+    }
+    if (ecid != 0) {
+        if (source) *source = @"mobilegestalt";
+        return ecid;
+    }
+
+    // Read the same physical ECID when MobileGestalt withholds its answer.
+    // The device-tree property is exactly 8 bytes in little-endian order.
+    // Never substitute IDFV, serial number, a random value, or cached input.
+    io_registry_entry_t chosen = IORegistryEntryFromPath(
+        kIOMasterPortDefault, "IODeviceTree:/chosen");
+    NSString *registryFailure = @"ioreg-node";
+    NSInteger registryCode = -2;
+    if (chosen != IO_OBJECT_NULL) {
+        CFTypeRef value = IORegistryEntryCreateCFProperty(chosen,
+            CFSTR("unique-chip-id"), kCFAllocatorDefault, 0);
+        IOObjectRelease(chosen);
+        registryFailure = @"ioreg-property";
+        registryCode = -3;
+        if (value) {
+            registryFailure = @"ioreg-type";
+            registryCode = -4;
+            if (CFGetTypeID(value) == CFDataGetTypeID()) {
+                CFDataRef data = (CFDataRef)value;
+                registryFailure = @"ioreg-length";
+                registryCode = -5;
+                if (CFDataGetLength(data) == sizeof(ecid)) {
+                    const UInt8 *bytes = CFDataGetBytePtr(data);
+                    for (NSUInteger i = 0; i < sizeof(ecid); i++)
+                        ecid |= ((unsigned long long)bytes[i]) << (i * 8);
+                    registryFailure = @"ioreg-zero";
+                    registryCode = -6;
+                }
+            }
+            CFRelease(value);
+        }
+    }
+    if (ecid != 0) {
+        if (source) *source = @"device-tree";
+        return ecid;
+    }
+    if (failureStage) *failureStage = [NSString stringWithFormat:
+        @"hardware-identity/%@/%@", gestaltFailure, registryFailure];
+    if (failureCode) *failureCode = registryCode;
+    return 0;
+}
+
 static inline NSDictionary<NSString *, id> *
 DORHSupporterHardwareIdentityProbe(void)
 {
-    CFPropertyListRef rawAnswer =
-        MGCopyAnswer(CFSTR("UniqueChipID"));
-
-    if (!rawAnswer) {
-        return @{
-            @"available" : @NO,
-            @"algorithm" : @"rh-hw-v1",
-            @"hardware_id" : @"",
-            @"hardware_hash" : @""
-        };
-    }
-
-    id answer = (__bridge id)rawAnswer;
-
-    if (![answer isKindOfClass:NSNumber.class]) {
-        CFRelease(rawAnswer);
-
-        return @{
-            @"available" : @NO,
-            @"algorithm" : @"rh-hw-v1",
-            @"hardware_id" : @"",
-            @"hardware_hash" : @""
-        };
-    }
-
-    unsigned long long ecid =
-        [(NSNumber *)answer unsignedLongLongValue];
-
-    CFRelease(rawAnswer);
-
+    NSString *source = nil;
+    NSString *failureStage = nil;
+    NSInteger failureCode = 0;
+    unsigned long long ecid = DORHSupporterReadHardwareECID(
+        &source, &failureStage, &failureCode);
     if (ecid == 0) {
         return @{
             @"available" : @NO,
             @"algorithm" : @"rh-hw-v1",
             @"hardware_id" : @"",
-            @"hardware_hash" : @""
+            @"hardware_hash" : @"",
+            @"stage" : failureStage ?: @"hardware-identity",
+            @"error_code" : @(failureCode)
         };
     }
 
@@ -159,6 +203,7 @@ DORHSupporterHardwareIdentityProbe(void)
 
     return @{
         @"available" : @YES,
+        @"source" : source,
         @"algorithm" : @"rh-hw-v1",
         @"hardware_id" : hardwareID,
         @"hardware_hash" : fullHash
@@ -1064,10 +1109,10 @@ DORHSupporterCreateRHP1Proof(NSData *challengeData,
         ![hardwareProtocol isEqualToString:@"rh-hw-v1"] ||
         !DORHSupporterIsUppercaseHexString(hardwareHash, 64)) {
         if (failureStage)
-            *failureStage = @"hardware-identity";
+            *failureStage = hardware[@"stage"] ?: @"hardware-identity";
 
         if (failureCode)
-            *failureCode = -1;
+            *failureCode = hardware[@"error_code"] ? [hardware[@"error_code"] integerValue] : -1;
 
         return nil;
     }

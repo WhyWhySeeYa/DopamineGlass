@@ -71,6 +71,122 @@ function objcMethod(sourceText, signature) {
   assert.fail(`Unclosed Objective-C method: ${signature}`);
 }
 
+test('hardware identity fallback reads only the same ECID and retains actionable failure stages', () => {
+  const readECID = body('DORHSupporterReadHardwareECID');
+  assert.ok(readECID.indexOf('MGCopyAnswer') < readECID.indexOf('IORegistryEntryFromPath'));
+  assert.match(readECID, /IODeviceTree:\/chosen/);
+  assert.match(readECID, /CFSTR\("unique-chip-id"\)/);
+  assert.match(readECID, /CFDataGetLength\(data\) == sizeof\(ecid\)/);
+  assert.match(readECID, /bytes\[i\]\) << \(i \* 8\)/);
+  assert.match(readECID, /IOObjectRelease\(chosen\)/);
+  assert.doesNotMatch(readECID, /NSLog|NSUserDefaults|writeToFile|identifierForVendor|SecItem/);
+  const proof = body('DORHSupporterCreateRHP1Proof');
+  assert.match(proof, /\*failureStage = hardware\[@"stage"\]/);
+  assert.match(proof, /hardware\[@"error_code"\] integerValue/);
+  assert.match(licenseUI, /hardware\[@"stage"\] \?: @"hardware-identity"/);
+});
+
+test('hardware access changes preserve every frozen license operation except diagnostic propagation', () => {
+  const tail = source.slice(source.indexOf('// Phase 2A Device Key'))
+    .replace('*failureStage = hardware[@"stage"] ?: @"hardware-identity";', '*failureStage = @"hardware-identity";')
+    .replace('*failureCode = hardware[@"error_code"] ? [hardware[@"error_code"] integerValue] : -1;', '*failureCode = -1;')
+    .replace(/\r\n/g, '\n').trim();
+  assert.equal(require('node:crypto').createHash('sha256').update(tail).digest('hex'),
+    '53b111a9aef0a6549b861f46a2d5daa52312de4e9a94c2e61f45c5a620bf802c');
+});
+
+test('native Foundation executes hardware identity fallback, canonical hashes and failure diagnostics', {
+  skip: process.platform !== 'darwin' && 'Requires macOS Foundation; MobileGestalt and IOKit are test doubles, production ECID reader and hashing run unchanged.',
+}, () => {
+  const os = require('node:os');
+  const crypto = require('node:crypto');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-hardware-'));
+  const expectedHash = hex => crypto.createHash('sha256').update('DopamineRH-HW-v1|' + hex).digest('hex').toUpperCase();
+  try {
+    const production = section(source, 'static inline unsigned long long\nDORHSupporterReadHardwareECID', '// Phase 2A Device Key');
+    const file = path.join(directory, 'main.m');
+    fs.writeFileSync(file, `#import <Foundation/Foundation.h>
+#import <CommonCrypto/CommonDigest.h>
+typedef unsigned int io_registry_entry_t;
+#define kIOMasterPortDefault 0
+#define IO_OBJECT_NULL 0
+static id gestaltAnswer, registryAnswer;
+static BOOL registryNode = YES;
+static NSUInteger registryReads, nodeReleases;
+static CFPropertyListRef MGCopyAnswer(CFStringRef key) {
+  if (![(__bridge NSString *)key isEqualToString:@"UniqueChipID"]) abort();
+  return gestaltAnswer ? CFRetain((__bridge CFTypeRef)gestaltAnswer) : NULL;
+}
+static io_registry_entry_t IORegistryEntryFromPath(unsigned int port, const char *path) {
+  if (port != 0 || strcmp(path, "IODeviceTree:/chosen")) abort();
+  registryReads++; return registryNode ? 42 : 0;
+}
+static CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t node, CFStringRef key, CFAllocatorRef allocator, unsigned int options) {
+  if (node != 42 || options != 0 || ![(__bridge NSString *)key isEqualToString:@"unique-chip-id"]) abort();
+  return registryAnswer ? CFRetain((__bridge CFTypeRef)registryAnswer) : NULL;
+}
+static int IOObjectRelease(io_registry_entry_t node) { if (node != 42) abort(); nodeReleases++; return 0; }
+${production}
+#define CHECK(x) do { if (!(x)) abort(); } while (0)
+int main(void) { @autoreleasepool {
+  unsigned char bytes[] = {0xEF, 0xCD, 0xAB, 0x89, 0x67, 0x45, 0x23, 0x01};
+  NSData *valid = [NSData dataWithBytes:bytes length:8];
+  NSString *expected = @"${expectedHash('0123456789ABCDEF')}";
+  NSString *hex = [expected substringToIndex:32];
+  NSMutableArray *groups = [NSMutableArray array];
+  for (NSUInteger i = 0; i < hex.length; i += 4) [groups addObject:[hex substringWithRange:NSMakeRange(i, 4)]];
+  NSString *expectedID = [@"D2-" stringByAppendingString:[groups componentsJoinedByString:@"-"]];
+  gestaltAnswer = @0x0123456789ABCDEFULL;
+  NSDictionary *hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK([hardware[@"hardware_hash"] isEqual:expected]);
+  CHECK([hardware[@"source"] isEqual:@"mobilegestalt"] && registryReads == 0);
+  // nil, wrong type, booleans, floating-point and zero all need a real ECID.
+  registryAnswer = valid;
+  for (id answer in @[NSNull.null, @"invalid", @YES, @1.5, @0]) {
+    gestaltAnswer = answer == NSNull.null ? nil : answer;
+    NSUInteger released = nodeReleases;
+    hardware = DORHSupporterHardwareIdentityProbe();
+    CHECK([hardware[@"available"] boolValue]);
+    CHECK([hardware[@"hardware_hash"] isEqual:expected]);
+    CHECK([hardware[@"hardware_id"] isEqual:expectedID]);
+    CHECK([hardware[@"source"] isEqual:@"device-tree"]);
+    CHECK(nodeReleases == released + 1);
+  }
+  gestaltAnswer = nil;
+  unsigned char highBytes[] = {0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE};
+  registryAnswer = [NSData dataWithBytes:highBytes length:8];
+  CHECK([DORHSupporterHardwareIdentityProbe()[@"hardware_hash"] isEqual:@"${expectedHash('FEDCBA9876543210')}"]);
+  gestaltAnswer = @0xFEDCBA9876543210ULL;
+  CHECK([DORHSupporterHardwareIdentityProbe()[@"hardware_hash"] isEqual:@"${expectedHash('FEDCBA9876543210')}"]);
+  gestaltAnswer = nil;
+  for (id invalid in @[NSNull.null, @42, @"123", [NSMutableData dataWithLength:7], [NSMutableData dataWithLength:9], [NSMutableData dataWithLength:8]]) {
+    registryAnswer = invalid == NSNull.null ? nil : invalid;
+    hardware = DORHSupporterHardwareIdentityProbe();
+    CHECK(![hardware[@"available"] boolValue]);
+    CHECK([hardware[@"hardware_hash"] length] == 0 && [hardware[@"hardware_id"] length] == 0);
+    CHECK([hardware[@"stage"] hasPrefix:@"hardware-identity/mg-missing/ioreg-"]);
+    CHECK([hardware[@"error_code"] integerValue] <= -3);
+  }
+  registryNode = NO; registryAnswer = valid;
+  hardware = DORHSupporterHardwareIdentityProbe();
+  CHECK([hardware[@"stage"] isEqual:@"hardware-identity/mg-missing/ioreg-node"]);
+  CHECK([hardware[@"error_code"] integerValue] == -2);
+  return 0;
+} }
+`);
+    const executable = path.join(directory, 'hardware-test');
+    for (const [command, args] of [
+      ['xcrun', ['clang', '-fobjc-arc', '-framework', 'Foundation', file, '-o', executable]],
+      [executable, []],
+    ]) {
+      const result = spawnSync(command, args, { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('authorization actions use matching numbered labels and brief copied-proof feedback without changing activation copy', () => {
   const actionKeys = ['Supporter_Copy_Device_Code', 'Supporter_Bind_This_Device', 'Supporter_Paste_License'];
   const value = (text, key) => {

@@ -2,6 +2,14 @@
 
 ## 2026-11-18 返回与设备证明修复
 
+### 真机反馈后的硬件身份读取修复
+
+用户安装 `fbc4534 / TEST-7` 后确认返回正常，但授权第二步仍出现 `hardware-identity / -1`。本地直接解析该 IPA 的 Mach-O 签名，已确认 `AllowedProtectedKeys = [UniqueChipID]` 确实存在，不能再把缺失权限当作已证实的唯一原因。
+
+现保留 MobileGestalt 为首选，失败时只读取 `IODeviceTree:/chosen` 的 `unique-chip-id`，严格要求为 8 字节数据并按小端解码为同一 ECID，再使用原 `rh-hw-v1` 算法生成哈希。未增加替代设备身份或降低签名/绑定要求。失败阶段细分为 `mg-missing/type/zero` 与 `ioreg-node/property/type/length/zero`，错误码为 -2 至 -6；生成证明和高级诊断均可显示这些非身份信息。
+
+新增 macOS 原生测试执行生产读取/哈希函数，模拟两种系统接口，覆盖主路径、后备路径、字节序、高位 ECID、布尔/浮点/零/错误长度和接口不可用；固定指纹另检查其余授权操作保持原代码不变。本地 Windows 回归为 115 项：108 通过、7 因环境跳过、0 失败；10 项 Python 归档测试和 13 项上游边界检查通过。原生测试须在云端执行，设备树读取能否解决该真机问题仍待安装新包验收。
+
 默认主题继续使用官方的紧凑卡片与“点击卡片外返回”交互，不增加玻璃返回按钮。移植曾把 `DOModalBackAction` 插到 UIKit 全屏容器下方；现将它置于容器上方，并在页面切换时恢复其层级，卡片内触摸仍由原 `ignoreFrame` 放行。玻璃页保留既有独立返回按钮。
 
 RHC1 解析通过后出现 `hardware-identity / -1`，表示生成 RHP1 时无法取得硬件身份。当前签名缺少 MobileGestalt 的受保护键声明；新增 `com.apple.private.MobileGestalt.AllowedProtectedKeys = [UniqueChipID]`，并要求最终可执行文件的签名也包含这一精确权限。硬件哈希算法、协议、设备码、密钥和合法旧授权不变。这是针对缺失权限的修复，是否消除设备报错仍须重新安装后的真机验收。
