@@ -15,11 +15,11 @@ static BOOL rootScope, unsandboxedScope;
 static NSUInteger rootAttempts, writes, invalidations;
 static NSUserDefaults *testDefaults;
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "Persistence test failed at line %d\n", __LINE__); abort(); } } while (0)
-@interface TestDefaults : NSObject
-+ (NSUserDefaults *)standardUserDefaults;
+@interface TestDefaults : NSUserDefaults
++ (id)standardUserDefaults;
 @end
 @implementation TestDefaults
-+ (NSUserDefaults *)standardUserDefaults { return testDefaults; }
++ (id)standardUserDefaults { return testDefaults; }
 @end
 @interface DOEnvironmentManager : NSObject
 + (instancetype)sharedManager;
