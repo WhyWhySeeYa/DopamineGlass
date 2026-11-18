@@ -10,6 +10,10 @@
 	</array>
 	<key>platform-application</key>
 	<true/>
+	<key>com.apple.private.MobileGestalt.AllowedProtectedKeys</key>
+	<array>
+		<string>UniqueChipID</string>
+	</array>
 	<key>proc_info-allow</key>
 	<true/>
 	<key>com.apple.private.persona-mgmt</key>

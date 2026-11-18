@@ -20,7 +20,13 @@ function harnessSource() {
   const settings = read(ui + 'Settings/DOSettingsController.m');
   const credits = read(ui + 'Settings/DOCreditsViewController.m');
   const material = read(ui + 'DOCustomGlassView.m');
+  const navigation = read(ui + 'DONavigationController.m');
   const replacements = {
+    MODAL_RETURN: read(ui + 'Transition/DOModalBackAction.h') + '\n' +
+      section(read(ui + 'Transition/DOModalBackAction.m'), '@implementation DOModalBackAction', '\n@end') + '\n@end',
+    MODAL_RETURN_SETUP: section(navigation,
+      '    __weak typeof(self) weakSelf = self;\n    self.backAction =',
+      '\n}\n\n- (void)customGlassApplySharedBackgroundBlurIntensity:'),
     MATERIAL_HEADER: read(ui + 'DOCustomGlassView.h'),
     MATERIAL: section(material, '@implementation DOCustomLiquidGlassView', '\n@end') + '\n@end',
     BASE: section(base, '- (void)viewDidLayoutSubviews', '#pragma mark'),

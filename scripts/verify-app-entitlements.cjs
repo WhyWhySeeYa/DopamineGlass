@@ -15,6 +15,8 @@ function verifyAppEntitlements(entitlements, info) {
     'preserve the existing platform application entitlement');
   assert.equal(entitlements['com.apple.private.security.no-sandbox'], true,
     'preserve the existing sandbox exemption');
+  assert.deepEqual(entitlements['com.apple.private.MobileGestalt.AllowedProtectedKeys'], ['UniqueChipID'],
+    'device proofs require scoped access to the existing rh-hw-v1 hardware identity');
   assert.equal(entitlements['com.apple.developer.team-identifier'], undefined,
     'do not invent a signing team for the TrollStore build');
 }

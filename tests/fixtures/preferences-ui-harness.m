@@ -14,6 +14,60 @@ static BOOL DOUsesCustomGlassTheme(void) { return TestAuthorization && TestGlass
 
 #define CHECK(condition) do { if (!(condition)) @throw [NSException exceptionWithName:@"LayoutFailure" reason:@#condition userInfo:nil]; } while (0)
 
+/* PRODUCTION_MODAL_RETURN */
+@interface ModalReturnHarness : UIViewController
+@property(nonatomic, strong) DOModalBackAction *backAction;
+@property(nonatomic) BOOL popped;
+- (void)setupReturnSurface;
+@end
+@implementation ModalReturnHarness
+- (UIViewController *)popViewControllerAnimated:(BOOL)animated { self.popped = YES; return nil; }
+- (void)setupReturnSurface
+{
+    /* PRODUCTION_MODAL_RETURN_SETUP */
+}
+@end
+
+static void CheckStockModalReturn(UIViewController *host)
+{
+    ModalReturnHarness *page = [ModalReturnHarness new];
+    [host addChildViewController:page];
+    [host.view addSubview:page.view];
+    [page didMoveToParentViewController:host];
+    for (NSValue *size in @[[NSValue valueWithCGSize:CGSizeMake(393, 852)],
+                            [NSValue valueWithCGSize:CGSizeMake(852, 393)]]) {
+        page.view.frame = (CGRect){CGPointZero, size.CGSizeValue};
+        UIView *wallpaper = [[UIView alloc] initWithFrame:page.view.bounds];
+        wallpaper.userInteractionEnabled = NO;
+        [page.view addSubview:wallpaper];
+        // UIKit's content container spans the screen, even though the visible
+        // Preferences card occupies only the middle. Reproduce that hierarchy.
+        UIView *container = [[UIView alloc] initWithFrame:page.view.bounds];
+        [page.view addSubview:container];
+        UIButton *card = [UIButton buttonWithType:UIButtonTypeSystem];
+        card.frame = CGRectInset(container.bounds, 24, 60);
+        [container addSubview:card];
+        [page setupReturnSurface];
+        page.backAction.hidden = NO;
+        [page.backAction setIgnoreFrame:card.frame];
+        [page.view layoutIfNeeded];
+        CHECK([page.view hitTest:CGPointMake(5, 5) withEvent:nil] == page.backAction);
+        CGPoint inside = CGPointMake(CGRectGetMidX(card.frame), CGRectGetMidY(card.frame));
+        CHECK([page.view hitTest:inside withEvent:nil] == card);
+        page.popped = NO;
+        [page.backAction touchesEnded:[NSSet set] withEvent:nil];
+        CHECK(page.popped);
+        page.backAction.hidden = YES;
+        CHECK([page.view hitTest:CGPointMake(5, 5) withEvent:nil] == container);
+        [page.backAction removeFromSuperview];
+        [container removeFromSuperview];
+        [wallpaper removeFromSuperview];
+    }
+    [page willMoveToParentViewController:nil];
+    [page.view removeFromSuperview];
+    [page removeFromParentViewController];
+}
+
 @interface CountingTable : UITableView
 @property(nonatomic) NSUInteger frameChanges;
 @end
@@ -266,6 +320,7 @@ static NSUInteger CheckAuthorizationBoundary(UIViewController *host)
 
 static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
 {
+    CheckStockModalReturn(host);
     NSUInteger checks = 0, viewports = 0;
     NSArray<NSValue *> *sizes = @[
         [NSValue valueWithCGSize:CGSizeMake(744, 1133)], [NSValue valueWithCGSize:CGSizeMake(1133, 744)],

@@ -37,6 +37,15 @@ jobs:
         run: |
           python3 scripts/build-glass-app.py prepare --work "$WORK"
           node scripts/prepare-glass-app-project.cjs "$WORK"
+      - name: Compile production UIKit layout and modal-return harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'require("node:fs").writeFileSync(process.env.WORK + "/preferences-ui-harness.m", require("./tests/helpers/preferences-ui-simulator.cjs").harnessSource())'
+          xcrun --sdk iphonesimulator clang -fobjc-arc -fmodules \
+            -isysroot "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            -target x86_64-apple-ios16.0-simulator -framework UIKit -framework QuartzCore \
+            "$WORK/preferences-ui-harness.m" -o "$WORK/preferences-ui-harness"
       - name: Compile current App only (no BaseBin or exploit targets)
         shell: bash
         run: |

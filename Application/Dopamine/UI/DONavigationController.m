@@ -515,7 +515,9 @@ static CGFloat DOCustomGlassNavigationScrimAlpha(CGFloat luminance, CGFloat hier
     self.backAction.translatesAutoresizingMaskIntoConstraints = NO;
     self.backAction.hidden = YES;
 
-    [self.view insertSubview:self.backAction atIndex:1];
+    // The upstream modal return surface must sit above UIKit's full-screen
+    // content container. Its ignoreFrame passes touches through to the card.
+    [self.view addSubview:self.backAction];
 
     [NSLayoutConstraint activateConstraints:@[
         [self.backAction.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
@@ -1119,6 +1121,7 @@ static CGFloat DOCustomGlassNavigationScrimAlpha(CGFloat luminance, CGFloat hier
         [self isCustomGlassFullScreenViewController:viewController];
     [self setBackgroundDimmed:!(isMainView || isCustomGlassView)];
     [self.backAction setIgnoreFrame:[self _frameForViewController:viewController]];
+    [self.view bringSubviewToFront:self.backAction];
 }
 
 #pragma mark - Overrides

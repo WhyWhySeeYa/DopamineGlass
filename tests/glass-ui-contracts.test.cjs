@@ -667,6 +667,23 @@ test('the reboot card and its confirmation have localized copy instead of raw ke
   }
 });
 
+test('stock modal return stays above the full-screen UIKit container and passes card touches through', () => {
+  const setup = section(navigation, '    self.backAction = [[DOModalBackAction alloc]',
+    '- (void)customGlassApplySharedBackgroundBlurIntensity:');
+  assert.match(setup, /\[self\.view addSubview:self\.backAction\]/);
+  assert.doesNotMatch(setup, /insertSubview:self\.backAction atIndex:/);
+  const delegate = section(navigation, '- (void)navigationController:(UINavigationController *)navigationController willShowViewController:', '#pragma mark - Overrides');
+  assert.match(delegate, /setBackgroundDimmed:!\(isMainView \|\| isCustomGlassView\)/);
+  assert.match(delegate, /setIgnoreFrame:\[self _frameForViewController:viewController\]/);
+  assert.match(delegate, /bringSubviewToFront:self\.backAction/);
+  const hitTest = read(ui + 'Transition/DOModalBackAction.m');
+  assert.match(hitTest, /CGRectContainsPoint\(self\.ignoreFrame, point\)\)\s*return NO/);
+  const harness = require('./helpers/preferences-ui-simulator.cjs').harnessSource();
+  assert.match(harness, /CheckStockModalReturn\(host\);/);
+  assert.match(harness, /hitTest:CGPointMake\(5, 5\) withEvent:nil\] == page\.backAction/);
+  assert.match(harness, /hitTest:inside withEvent:nil\] == card/);
+});
+
 test('settings has a fixed accessible 44-point back button and left-edge return', () => {
   const load = section(settings, '- (void)viewDidLoad', '- (void)customGlassBackPressed');
   assert.match(load, /customGlassBackButton = backButton/);

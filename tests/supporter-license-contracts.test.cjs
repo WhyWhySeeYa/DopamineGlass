@@ -125,6 +125,7 @@ test('packaged entitlement verifier rejects missing, broad or mismatched keychai
     'keychain-access-groups': [info.CFBundleIdentifier],
     'platform-application': true,
     'com.apple.private.security.no-sandbox': true,
+    'com.apple.private.MobileGestalt.AllowedProtectedKeys': ['UniqueChipID'],
   };
   assert.doesNotThrow(() => verifyAppEntitlements(valid, info));
   for (const key of Object.keys(valid)) {
@@ -139,6 +140,10 @@ test('packaged entitlement verifier rejects missing, broad or mismatched keychai
   assert.throws(() => verifyAppEntitlements({ ...valid, 'application-identifier': 'other.app' }, info));
   assert.throws(() => verifyAppEntitlements({ ...valid, 'com.apple.developer.team-identifier': 'FAKETEAM' }, info));
   assert.throws(() => verifyAppEntitlements(valid, { CFBundleIdentifier: 'other.app' }));
+  for (const keys of [[], ['*'], ['SerialNumber'], ['UniqueChipID', 'SerialNumber'], 'UniqueChipID']) {
+    assert.throws(() => verifyAppEntitlements({ ...valid,
+      'com.apple.private.MobileGestalt.AllowedProtectedKeys': keys }, info));
+  }
 });
 
 test('source entitlements pass the native plist parser and scoped keychain contract', {
