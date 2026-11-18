@@ -207,3 +207,10 @@
 
 "Supporter_Save_Failed" = "Unable to save license";
 "Supporter_Save_Failed_Message" = "The license was verified, but could not be saved. Complete the jailbreak, reopen this app and paste the same license again. You do not need a new license.";
+
+/* Custom Glass import and persistence feedback. */
+"Glass_Media_Import_Failed" = "Changes could not be completed";
+"Glass_Media_Load_Failed" = "The selected photo or video could not be loaded. Download it from iCloud if needed, then try again. Your previous media has been kept.";
+"Glass_Media_Save_Failed" = "The changes could not be saved. Your previous settings have been kept. On a normally signed installation, complete jailbreak and reopen the app before trying again.";
+"Glass_Media_Authorization_Required" = "Glass theme authorization is no longer available. Verify your authorization and try again.";
+"Glass_Media_LivePhoto_Failed" = "The Live Photo motion resource could not be imported. Your previous wallpaper has been kept. Download the original from iCloud and try again, or select a still photo.";

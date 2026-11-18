@@ -175,5 +175,62 @@
     "upstreamChecks": 13,
     "macOSNativeTest": "pending cloud run; OS interfaces mocked, production reader and hash execute",
     "deviceValidation": "pending new candidate install"
+  },
+  "signedInstallAuthorizationFollowup": {
+    "date": "2026-11-18",
+    "reportedErrors": [
+      "hardware-identity/mg-missing/ioreg-property (-3)",
+      "Unable to persist supporter license (9)"
+    ],
+    "sourceCommit": "ef51f70",
+    "workflowRun": 44264392649,
+    "change": "Reuse RC9 license protocol and persistence unchanged outside small ZQBB access adapters; retry denied hardware and file I/O within the existing active jailbreak scope.",
+    "localNodeTests": {
+      "tests": 116,
+      "pass": 108,
+      "fail": 0,
+      "skipped": 8
+    },
+    "pythonArchiveTests": {
+      "tests": 10,
+      "pass": 10
+    },
+    "upstreamChecks": 13,
+    "macOSNativeTests": "Source regression and upstream boundaries passed, including production hardware and persistence harnesses; OS access restrictions simulated.",
+    "uikitHarness": "compiled successfully",
+    "appBuild": "Last observed compiling; final status query was rejected, completion not confirmed.",
+    "newInstaller": "not downloaded or verified",
+    "deviceValidation": "User reports authorization succeeded; exact installed artifact is not independently confirmed."
+  },
+  "glassFunctionalAudit": {
+    "date": "2026-11-18",
+    "comparison": "RC9 f6295a2 reference working tree; wallpaper/video/Live Photo entry points present",
+    "localNodeTests": {
+      "tests": 119,
+      "pass": 111,
+      "fail": 0,
+      "skipped": 8
+    },
+    "pythonArchiveTests": {
+      "tests": 10,
+      "pass": 10,
+      "fail": 0
+    },
+    "upstreamChecks": 13,
+    "fixes": [
+      "signed-install theme access",
+      "retryable validated container lookup",
+      "media failure feedback",
+      "atomic theme parameter commits",
+      "retain theme selection on license loss",
+      "foreground authorization refresh",
+      "Unicode text limits",
+      "glass action ownership and deferred home refresh",
+      "RC9 English injection mode labels"
+    ],
+    "macOSNativeTests": "pending",
+    "appBuild": "pending",
+    "deviceValidation": "pending new candidate installation; no claim of reproduced device failure",
+    "nonJailbrokenSignedInstall": "External storage denial fails visibly with previous values retained; no incompatible local shadow format introduced."
   }
 }

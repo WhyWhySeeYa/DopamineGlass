@@ -27,6 +27,21 @@
 #import <mach/mach_time.h>
 #import <libjailbreak/libjailbreak.h>
 
+static NSString *DOCustomGlassLimitedText(NSString *text, NSUInteger limit, NSUInteger *count)
+{
+    __block NSUInteger characters = 0;
+    __block NSUInteger end = 0;
+    [text enumerateSubstringsInRange:NSMakeRange(0, text.length)
+                            options:NSStringEnumerationByComposedCharacterSequences
+                         usingBlock:^(NSString *substring, NSRange range, NSRange enclosingRange, BOOL *stop) {
+        if (characters == limit) { *stop = YES; return; }
+        characters++;
+        end = NSMaxRange(range);
+    }];
+    if (count) *count = characters;
+    return [text substringToIndex:end];
+}
+
 @interface DOMainViewController () <PHPickerViewControllerDelegate>
 
 @property DOJailbreakButton *jailbreakBtn;
@@ -191,8 +206,14 @@
     DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
     NSString *systemVersion = [NSString stringWithFormat:@"iOS %@", UIDevice.currentDevice.systemVersion];
     if (environment.isJailbroken) {
+        // RC9's glass profile uses English mode names in every locale.
+        NSString *mode = [environment injectionModeDescription];
+        if ([mode isEqualToString:DOLocalizedString(@"Injection_Mode_Whitelist")])
+            mode = @"Whitelist";
+        else if ([mode isEqualToString:DOLocalizedString(@"Injection_Mode_Blacklist")])
+            mode = @"Blacklist";
         self.customGlassSystemLabel.text =
-            [NSString stringWithFormat:@"%@ | %@", systemVersion, [environment injectionModeDescription]];
+            [NSString stringWithFormat:@"%@ | %@", systemVersion, mode];
     } else {
         self.customGlassSystemLabel.text = systemVersion;
     }
@@ -230,10 +251,16 @@
 
 - (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results
 {
-    [picker dismissViewControllerAnimated:YES completion:nil];
+    [picker dismissViewControllerAnimated:YES completion:^{
+        [self importCustomGlassAvatarResult:results.firstObject];
+    }];
+}
 
-    PHPickerResult *result = results.firstObject;
-    if (!result || !DORHSupporterIsVerified())
+- (void)importCustomGlassAvatarResult:(PHPickerResult *)result
+{
+    if (!result)
+        return;
+    if (![self requireCustomGlassSupporterAuthorization])
         return;
 
     NSProgress *request = [NSProgress progressWithTotalUnitCount:1];
@@ -242,26 +269,37 @@
         self.customGlassAvatarImport = request;
     }
     NSItemProvider *provider = result.itemProvider;
-    if (![provider canLoadObjectOfClass:UIImage.class])
+    if (![provider canLoadObjectOfClass:UIImage.class]) {
+        DOCustomGlassPresentMediaImportError(self, @"Glass_Media_Load_Failed");
         return;
+    }
 
     __weak typeof(self) weakSelf = self;
     [provider loadObjectOfClass:UIImage.class
               completionHandler:^(id<NSItemProviderReading> object, NSError *error) {
-        if (error || ![object isKindOfClass:UIImage.class] || request.cancelled || !weakSelf)
+        if (request.cancelled || !weakSelf)
             return;
-
-        UIImage *image = (UIImage *)object;
-        if (!DORHSupporterIsVerified()) {
+        if (error || ![object isKindOfClass:UIImage.class] || !DORHSupporterIsVerified()) {
+            NSString *messageKey = error || ![object isKindOfClass:UIImage.class] ?
+                @"Glass_Media_Load_Failed" : @"Glass_Media_Authorization_Required";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (!request.cancelled)
+                    DOCustomGlassPresentMediaImportError(weakSelf, messageKey);
+            });
             return;
         }
 
+        UIImage *image = (UIImage *)object;
         UIImage *persistedAvatar = nil;
         BOOL saved = DOCustomGlassMediaStoreSaveAvatar(image, request, &persistedAvatar);
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (!saved || request.cancelled)
+            if (request.cancelled)
                 return;
+            if (!saved) {
+                DOCustomGlassPresentMediaImportError(weakSelf, @"Glass_Media_Save_Failed");
+                return;
+            }
 
             // Show the exact object decoded back from the committed media file.
             weakSelf.customGlassAvatarPhotoView.image = persistedAvatar;
@@ -280,10 +318,13 @@
 
     NSString *currentUsername = [NSUserDefaults.standardUserDefaults stringForKey:DOCustomGlassUsernameKey] ?: @"";
 
+    NSUInteger currentCharacterCount = 0;
+    DOCustomGlassLimitedText(currentUsername, NSUIntegerMax, &currentCharacterCount);
+
     UIAlertController *alert =
         [UIAlertController alertControllerWithTitle:@"用户名"
                                             message:[NSString stringWithFormat:@"%lu / %lu",
-                                                     (unsigned long)currentUsername.length,
+                                                     (unsigned long)currentCharacterCount,
                                                      (unsigned long)DOCustomGlassUsernameCharacterLimit]
                                      preferredStyle:UIAlertControllerStyleAlert];
 
@@ -297,23 +338,28 @@
     }];
 
     __weak typeof(self) weakSelf = self;
+    __weak UIAlertController *weakAlert = alert;
     [alert addAction:[UIAlertAction actionWithTitle:@"取消"
                                               style:UIAlertActionStyleCancel
                                             handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"保存"
                                               style:UIAlertActionStyleDefault
                                             handler:^(__kindof UIAlertAction * _Nonnull action) {
-        NSString *username = alert.textFields.firstObject.text ?: @"";
-        if (username.length > DOCustomGlassUsernameCharacterLimit)
-            username = [username substringToIndex:DOCustomGlassUsernameCharacterLimit];
+        NSString *username = weakAlert.textFields.firstObject.text ?: @"";
+        username = DOCustomGlassLimitedText(username, DOCustomGlassUsernameCharacterLimit, NULL);
 
         if (!DORHSupporterIsVerified()) {
             weakSelf.customGlassUsernameEditor = nil;
             return;
         }
 
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        [defaults setObject:username forKey:DOCustomGlassUsernameKey];
+        if (!DOCustomGlassThemeSyncCommitChanges(@{DOCustomGlassUsernameKey:username})) {
+            [weakAlert dismissViewControllerAnimated:YES completion:^{
+                DOCustomGlassPresentMediaImportError(weakSelf, @"Glass_Media_Save_Failed");
+            }];
+            weakSelf.customGlassUsernameEditor = nil;
+            return;
+        }
         weakSelf.customGlassUsernameLabel.text = username.length > 0 ? username : @"RootHide User";
         weakSelf.customGlassUsernameEditor = nil;
     }]];
@@ -324,15 +370,14 @@
 
 - (void)customGlassUsernameTextChanged:(UITextField *)textField
 {
+    if (textField.markedTextRange) return;
     NSString *text = textField.text ?: @"";
-    if (text.length > DOCustomGlassUsernameCharacterLimit) {
-        text = [text substringToIndex:DOCustomGlassUsernameCharacterLimit];
-        textField.text = text;
-    }
+    NSUInteger count = 0;
+    textField.text = DOCustomGlassLimitedText(text, DOCustomGlassUsernameCharacterLimit, &count);
 
     self.customGlassUsernameEditor.message =
         [NSString stringWithFormat:@"%lu / %lu",
-         (unsigned long)text.length,
+         (unsigned long)count,
          (unsigned long)DOCustomGlassUsernameCharacterLimit];
 }
 
@@ -343,10 +388,13 @@
 
     NSString *currentMotto = [NSUserDefaults.standardUserDefaults stringForKey:DOCustomGlassMottoKey] ?: @"";
 
+    NSUInteger currentCharacterCount = 0;
+    DOCustomGlassLimitedText(currentMotto, NSUIntegerMax, &currentCharacterCount);
+
     UIAlertController *alert =
         [UIAlertController alertControllerWithTitle:@"个性签名"
                                             message:[NSString stringWithFormat:@"%lu / %lu",
-                                                     (unsigned long)currentMotto.length,
+                                                     (unsigned long)currentCharacterCount,
                                                      (unsigned long)DOCustomGlassMottoCharacterLimit]
                                      preferredStyle:UIAlertControllerStyleAlert];
 
@@ -360,22 +408,28 @@
     }];
 
     __weak typeof(self) weakSelf = self;
+    __weak UIAlertController *weakAlert = alert;
     [alert addAction:[UIAlertAction actionWithTitle:@"取消"
                                               style:UIAlertActionStyleCancel
                                             handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"保存"
                                               style:UIAlertActionStyleDefault
                                             handler:^(__kindof UIAlertAction * _Nonnull action) {
-        NSString *motto = alert.textFields.firstObject.text ?: @"";
-        if (motto.length > DOCustomGlassMottoCharacterLimit)
-            motto = [motto substringToIndex:DOCustomGlassMottoCharacterLimit];
+        NSString *motto = weakAlert.textFields.firstObject.text ?: @"";
+        motto = DOCustomGlassLimitedText(motto, DOCustomGlassMottoCharacterLimit, NULL);
 
         if (!DORHSupporterIsVerified()) {
             weakSelf.customGlassMottoEditor = nil;
             return;
         }
 
-        [[NSUserDefaults standardUserDefaults] setObject:motto forKey:DOCustomGlassMottoKey];
+        if (!DOCustomGlassThemeSyncCommitChanges(@{DOCustomGlassMottoKey:motto})) {
+            [weakAlert dismissViewControllerAnimated:YES completion:^{
+                DOCustomGlassPresentMediaImportError(weakSelf, @"Glass_Media_Save_Failed");
+            }];
+            weakSelf.customGlassMottoEditor = nil;
+            return;
+        }
         weakSelf.customGlassMottoLabel.text = motto.length > 0 ? motto : @"motto";
         weakSelf.customGlassMottoEditor = nil;
     }]];
@@ -386,15 +440,14 @@
 
 - (void)customGlassMottoTextChanged:(UITextField *)textField
 {
+    if (textField.markedTextRange) return;
     NSString *text = textField.text ?: @"";
-    if (text.length > DOCustomGlassMottoCharacterLimit) {
-        text = [text substringToIndex:DOCustomGlassMottoCharacterLimit];
-        textField.text = text;
-    }
+    NSUInteger count = 0;
+    textField.text = DOCustomGlassLimitedText(text, DOCustomGlassMottoCharacterLimit, &count);
 
     self.customGlassMottoEditor.message =
         [NSString stringWithFormat:@"%lu / %lu",
-         (unsigned long)text.length,
+         (unsigned long)count,
          (unsigned long)DOCustomGlassMottoCharacterLimit];
 }
 
@@ -581,14 +634,19 @@
     if (!self.customGlassAvatarContainerView)
         return;
 
+    if (persist) {
+        if (![self requireCustomGlassSupporterAuthorization]) return;
+        if (!DOCustomGlassThemeSyncCommitChanges(@{
+            DOCustomGlassProfileFocusEnabledKey:@(enabled),
+            DOCustomGlassProfileFocusDockRightKey:@(dockRight)
+        })) {
+            DOCustomGlassPresentMediaImportError(self, @"Glass_Media_Save_Failed");
+            return;
+        }
+    }
+
     self.customGlassProfileFocusEnabled = enabled;
     self.customGlassProfileFocusDockRight = dockRight;
-
-    if (persist) {
-        NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-        [defaults setBool:enabled forKey:DOCustomGlassProfileFocusEnabledKey];
-        [defaults setBool:dockRight forKey:DOCustomGlassProfileFocusDockRightKey];
-    }
 
     [self.view layoutIfNeeded];
 
@@ -1078,10 +1136,15 @@
         [rightColumn.bottomAnchor constraintEqualToAnchor:actionGrid.bottomAnchor]
     ]];
 
+    __weak typeof(self) weakHome = self;
     UIAction *settingsAction = [UIAction actionWithHandler:^(__kindof UIAction * _Nonnull action) {
+        __strong typeof(weakHome) self = weakHome;
+        if (!self) return;
         [self.navigationController pushViewController:[[DOSettingsController alloc] init] animated:YES];
     }];
     UIAction *creditsAction = [UIAction actionWithHandler:^(__kindof UIAction * _Nonnull action) {
+        __strong typeof(weakHome) self = weakHome;
+        if (!self) return;
         [self.navigationController pushViewController:[[DOCreditsViewController alloc] init] animated:YES];
     }];
 
@@ -1091,6 +1154,8 @@
     [leftColumn addArrangedSubview:creditsCard];
 
     UIAction *themeAction = [UIAction actionWithHandler:^(__kindof UIAction * _Nonnull action) {
+        __strong typeof(weakHome) self = weakHome;
+        if (!self) return;
         if (![self requireCustomGlassSupporterAuthorization])
             return;
 
@@ -1135,16 +1200,22 @@
     BOOL isSupported = [[DOEnvironmentManager sharedManager] isSupported];
 
     UIAction *respringAction = [UIAction actionWithHandler:^(__kindof UIAction * _Nonnull action) {
+        __strong typeof(weakHome) self = weakHome;
+        if (!self) return;
         [self performCustomGlassMaintenance:^{
             [[DOEnvironmentManager sharedManager] respring];
         }];
     }];
     UIAction *userspaceAction = [UIAction actionWithHandler:^(__kindof UIAction * _Nonnull action) {
+        __strong typeof(weakHome) self = weakHome;
+        if (!self) return;
         [self performCustomGlassMaintenance:^{
             [[DOEnvironmentManager sharedManager] rebootUserspace];
         }];
     }];
     UIAction *rebootAction = [UIAction actionWithHandler:^(__kindof UIAction * _Nonnull action) {
+        __strong typeof(weakHome) self = weakHome;
+        if (!self) return;
         UIAlertController *confirmation = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Menu_Reboot_Device_Title") message:DOLocalizedString(@"Alert_Reboot_Device_Body") preferredStyle:UIAlertControllerStyleAlert];
         [confirmation addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel") style:UIAlertActionStyleCancel handler:nil]];
         [confirmation addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Reboot") style:UIAlertActionStyleDestructive handler:^(__kindof UIAlertAction * _Nonnull alertAction) {
@@ -1182,6 +1253,8 @@
     __block DOCustomLiquidGlassView *jailbreakMaterialGlass = nil;
 
     self.jailbreakBtn = [[DOJailbreakButton alloc] initWithAction:[UIAction actionWithTitle:jailbreakButtonTitle image:jailbreakButtonImage identifier:@"jailbreak" handler:^(__kindof UIAction * _Nonnull action) {
+        __strong typeof(weakHome) self = weakHome;
+        if (!self) return;
 /********************************** roothide specific ************************************/
 
         if (otherJailbreakActived(false)) {
@@ -1388,6 +1461,14 @@
     [self stopUptimeTimer];
 }
 
+- (void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:animated];
+    if ([self refreshHomePresentationIfNeeded]) return;
+    self.informationVisible = YES;
+    [self resumeSystemInformationUpdates];
+}
+
 // 释放定时器及通知观察，避免页面退出后继续刷新。
 - (void)dealloc
 {
@@ -1501,8 +1582,9 @@
         releaseTo = [[DOUIManager sharedInstance] getLaunchedReleaseTag];
     }
 
+    __weak typeof(self) weakSelf = self;
     self.updateButton = [DOActionMenuButton buttonWithAction:[UIAction actionWithTitle:title image:[UIImage systemImageNamed:@"arrow.down.circle" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"update-available" handler:^(__kindof UIAction * _Nonnull action) {
-        [self.navigationController pushViewController:[[DOUpdateViewController alloc] initFromTag:releaseFrom toTag:releaseTo] animated:YES];
+        [weakSelf.navigationController pushViewController:[[DOUpdateViewController alloc] initFromTag:releaseFrom toTag:releaseTo] animated:YES];
     }] chevron:NO];
 
     self.updateButton.translatesAutoresizingMaskIntoConstraints = NO;

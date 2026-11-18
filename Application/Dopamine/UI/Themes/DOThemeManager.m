@@ -86,8 +86,8 @@ static NSString * const DODefaultThemeKey = @"default";
         value = DODefaultThemeKey;
 
     if ([value isEqualToString:DOCustomGlassThemeKey] && !supporterVerified) {
+        // Fall back for this presentation without erasing the user's choice.
         value = DODefaultThemeKey;
-        [preferences setPreferenceValue:value forKey:@"theme"];
     }
 
     DOTheme *theme = [self getThemeForKey:value];

@@ -10,6 +10,20 @@
 #import <Photos/Photos.h>
 #import <AVFoundation/AVFoundation.h>
 
+void DOCustomGlassPresentMediaImportError(UIViewController *controller, NSString *messageKey)
+{
+    // Import starts after the picker finishes dismissing; errors arrive on main.
+    if (!controller.viewIfLoaded.window || controller.presentedViewController)
+        return;
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:DOLocalizedString(@"Glass_Media_Import_Failed")
+                         message:DOLocalizedString(messageKey)
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close")
+                                             style:UIAlertActionStyleDefault handler:nil]];
+    [controller presentViewController:alert animated:YES completion:nil];
+}
+
 @interface DOCustomWallpaperBlurView : UIView
 
 @property(nonatomic, strong) UIVisualEffectView *fallbackBlurView;
@@ -610,15 +624,23 @@ static UIButton *DOCustomGlassBackButton(UIViewController *controller)
 - (void)supporterLicenseDidChange:(NSNotification *)notification
 {
     (void)notification;
+    if (![NSThread isMainThread]) {
+        __weak typeof(self) weakSelf = self;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf supporterLicenseDidChange:notification];
+        });
+        return;
+    }
     self.supporterAuthorizationKnown = NO;
+    if (self.isViewLoaded)
+        [self refreshThemePageFromPersistedState];
 }
 
 - (BOOL)requireCustomGlassSupporterAuthorization
 {
-    if (!self.supporterAuthorizationKnown) {
-        self.supporterAuthorizationVerified = DORHSupporterIsVerified();
-        self.supporterAuthorizationKnown = YES;
-    }
+    // Revalidate each operation after backgrounding or external license changes.
+    self.supporterAuthorizationVerified = DORHSupporterIsVerified();
+    self.supporterAuthorizationKnown = YES;
 
     if (self.supporterAuthorizationVerified)
         return YES;
@@ -1070,10 +1092,16 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
 
 - (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results
 {
-    [picker dismissViewControllerAnimated:YES completion:nil];
+    [picker dismissViewControllerAnimated:YES completion:^{
+        [self importCustomGlassWallpaperResult:results.firstObject];
+    }];
+}
 
-    PHPickerResult *result = results.firstObject;
-    if (!result || !DORHSupporterIsVerified())
+- (void)importCustomGlassWallpaperResult:(PHPickerResult *)result
+{
+    if (!result)
+        return;
+    if (![self requireCustomGlassSupporterAuthorization])
         return;
 
     NSProgress *request = [NSProgress progressWithTotalUnitCount:1];
@@ -1084,10 +1112,20 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
     NSItemProvider *provider = result.itemProvider;
     __weak typeof(self) weakSelf = self;
 
+    void (^failWallpaperImport)(NSString *) = ^(NSString *messageKey) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!request.cancelled)
+                DOCustomGlassPresentMediaImportError(weakSelf, messageKey);
+        });
+    };
     void (^finishWallpaperImport)(BOOL) = ^(BOOL saved) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (!saved || request.cancelled)
+            if (request.cancelled)
                 return;
+            if (!saved) {
+                DOCustomGlassPresentMediaImportError(weakSelf, @"Glass_Media_Save_Failed");
+                return;
+            }
 
             [[UIApplication sharedApplication] ignoreSnapshotOnNextApplicationLaunch];
 
@@ -1102,8 +1140,12 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
     };
 
     void (^importStaticImage)(void) = ^{
-        if (request.cancelled || !weakSelf || ![provider canLoadObjectOfClass:UIImage.class])
+        if (request.cancelled || !weakSelf)
             return;
+        if (![provider canLoadObjectOfClass:UIImage.class]) {
+            failWallpaperImport(@"Glass_Media_Load_Failed");
+            return;
+        }
 
         [provider loadObjectOfClass:UIImage.class
                   completionHandler:^(id<NSItemProviderReading> object, NSError *error) {
@@ -1111,11 +1153,12 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
                 return;
             if (error || ![object isKindOfClass:UIImage.class]) {
                 NSLog(@"[CustomGlass][Wallpaper] image provider failed: %@", error);
+                failWallpaperImport(@"Glass_Media_Load_Failed");
                 return;
             }
 
             if (!DORHSupporterIsVerified()) {
-                finishWallpaperImport(NO);
+                failWallpaperImport(@"Glass_Media_Authorization_Required");
                 return;
             }
 
@@ -1134,7 +1177,7 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
                 return;
             if (error || ![object isKindOfClass:PHLivePhoto.class]) {
                 NSLog(@"[CustomGlass][LivePhoto] provider failed: %@", error);
-                importStaticImage();
+                failWallpaperImport(@"Glass_Media_LivePhoto_Failed");
                 return;
             }
 
@@ -1144,12 +1187,12 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
                     return;
                 if (exportError || !videoURL || !poster) {
                     NSLog(@"[CustomGlass][LivePhoto] export failed: %@", exportError);
-                    importStaticImage();
+                    failWallpaperImport(@"Glass_Media_LivePhoto_Failed");
                     return;
                 }
 
                 if (!DORHSupporterIsVerified()) {
-                    finishWallpaperImport(NO);
+                    failWallpaperImport(@"Glass_Media_Authorization_Required");
                     return;
                 }
 
@@ -1169,19 +1212,23 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
                 return;
             if (error || !fileURL) {
                 NSLog(@"[CustomGlass][VideoWallpaper] provider failed: %@", error);
+                failWallpaperImport(@"Glass_Media_Load_Failed");
                 return;
             }
 
             // PHPicker's representation URL is temporary. Generate the poster
             // and copy the movie into MediaStore before this callback returns.
             if (!DORHSupporterIsVerified()) {
-                finishWallpaperImport(NO);
+                failWallpaperImport(@"Glass_Media_Authorization_Required");
                 return;
             }
 
             UIImage *poster = DOCustomGlassCreateVideoPosterImage(fileURL);
-            BOOL saved = poster ?
-                DOCustomGlassMediaStoreSaveWallpaperVideo(fileURL, poster, request, NULL) : NO;
+            if (!poster) {
+                failWallpaperImport(@"Glass_Media_Load_Failed");
+                return;
+            }
+            BOOL saved = DOCustomGlassMediaStoreSaveWallpaperVideo(fileURL, poster, request, NULL);
             finishWallpaperImport(saved);
         }];
         return;
@@ -1221,6 +1268,10 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(supporterLicenseDidChange:)
                                                  name:DORHSupporterLicenseDidChangeNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(supporterLicenseDidChange:)
+                                                 name:UIApplicationDidBecomeActiveNotification
                                                object:nil];
 
     self.title = @"主题设置";
@@ -1608,12 +1659,14 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
         return;
     }
 
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *appearance = control.selectedSegmentIndex == 1 ?
         DOCustomGlassAppearanceDark : DOCustomGlassAppearanceLight;
 
-    [defaults setObject:appearance forKey:DOCustomGlassAppearanceKey];
-    [defaults synchronize];
+    if (!DOCustomGlassThemeSyncCommitChanges(@{DOCustomGlassAppearanceKey:appearance})) {
+        [self syncAppearanceControlsFromDefaults];
+        DOCustomGlassPresentMediaImportError(self, @"Glass_Media_Save_Failed");
+        return;
+    }
 
     [[NSNotificationCenter defaultCenter]
         postNotificationName:DOCustomGlassThemeDidChangeNotification object:nil];
@@ -1641,6 +1694,7 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
 
     CGFloat playbackRate = DOCustomGlassPlaybackRateForSegmentIndex(control.selectedSegmentIndex);
     [self.navigationController customGlassSetWallpaperPlaybackRate:playbackRate];
+    [self syncAppearanceControlsFromDefaults];
 }
 
 - (void)applyAppearancePreviewAndPersist:(BOOL)persist
@@ -1655,15 +1709,17 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
     CGFloat transparency = self.glassTransparencySlider.value;
     CGFloat tintAlpha = self.glassTintSlider.value;
 
-    [self.navigationController customGlassApplySharedBackgroundBlurIntensity:backgroundBlur];
-
     if (persist) {
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        [defaults setFloat:backgroundBlur forKey:DOCustomGlassBackgroundBlurKey];
-        [defaults setFloat:glassBlur forKey:DOCustomGlassBlurIntensityKey];
-        [defaults setFloat:transparency forKey:DOCustomGlassTransparencyKey];
-        [defaults setFloat:tintAlpha forKey:DOCustomGlassTintAlphaKey];
-        [defaults synchronize];
+        if (!DOCustomGlassThemeSyncCommitChanges(@{
+            DOCustomGlassBackgroundBlurKey:@(backgroundBlur),
+            DOCustomGlassBlurIntensityKey:@(glassBlur),
+            DOCustomGlassTransparencyKey:@(transparency),
+            DOCustomGlassTintAlphaKey:@(tintAlpha)
+        })) {
+            [self syncAppearanceControlsFromDefaults];
+            DOCustomGlassPresentMediaImportError(self, @"Glass_Media_Save_Failed");
+            return;
+        }
 
         // DOMainViewController stays alive underneath this pushed settings page.
         // Notify it immediately so its already-created Glass surfaces consume
@@ -1671,6 +1727,9 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
         [[NSNotificationCenter defaultCenter]
             postNotificationName:DOCustomGlassThemeDidChangeNotification object:nil];
     }
+
+    if (DOUsesCustomGlassTheme())
+        [self.navigationController customGlassApplySharedBackgroundBlurIntensity:backgroundBlur];
 
     // Refresh every glass surface on this page, including the Background row
     // and the live controls panel, from the exact same persisted parameters the
@@ -1689,19 +1748,22 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
     if (![self requireCustomGlassSupporterAuthorization])
         return;
 
-    self.glassAppearanceControl.selectedSegmentIndex = 0;
-    self.backgroundBlurSlider.value = 0.10;
-    self.glassBlurSlider.value = 0.85;
-    self.glassTransparencySlider.value = 0.70;
-    self.glassTintSlider.value = 0.05;
-    if (self.wallpaperPlaybackRateControl)
-        self.wallpaperPlaybackRateControl.selectedSegmentIndex = 1;
-
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults setObject:DOCustomGlassAppearanceLight forKey:DOCustomGlassAppearanceKey];
+    if (!DOCustomGlassThemeSyncCommitChanges(@{
+        DOCustomGlassAppearanceKey:DOCustomGlassAppearanceLight,
+        DOCustomGlassBackgroundBlurKey:@0.10,
+        DOCustomGlassBlurIntensityKey:@0.85,
+        DOCustomGlassTransparencyKey:@0.70,
+        DOCustomGlassTintAlphaKey:@0.05,
+        DOCustomGlassWallpaperPlaybackRateKey:@(DOCustomGlassWallpaperPlaybackRateDefault)
+    })) {
+        DOCustomGlassPresentMediaImportError(self, @"Glass_Media_Save_Failed");
+        return;
+    }
+    [self syncAppearanceControlsFromDefaults];
     [self.navigationController customGlassSetWallpaperPlaybackRate:DOCustomGlassWallpaperPlaybackRateDefault];
-
-    [self applyAppearancePreviewAndPersist:YES];
+    [self applyAppearancePreviewAndPersist:NO];
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:DOCustomGlassThemeDidChangeNotification object:nil];
 }
 
 - (void)handleEdgeBackGesture:(UIScreenEdgePanGestureRecognizer *)gesture
@@ -1720,9 +1782,7 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
     @synchronized(NSUserDefaults.class) {
         [_wallpaperImport cancel];
     }
-    [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                    name:DORHSupporterLicenseDidChangeNotification
-                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)viewWillDisappear:(BOOL)animated

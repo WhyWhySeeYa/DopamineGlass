@@ -727,9 +727,12 @@ static CGFloat DOCustomGlassNavigationScrimAlpha(CGFloat luminance, CGFloat hier
 - (void)customGlassSetWallpaperPlaybackRate:(CGFloat)playbackRate
 {
     CGFloat clampedRate = MIN(1.0, MAX(0.25, playbackRate));
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults setFloat:clampedRate forKey:DOCustomGlassNavigationPlaybackRateKey];
-    [defaults synchronize];
+    if (!DOUsesCustomGlassTheme())
+        return;
+    if (!DOCustomGlassThemeSyncCommitChanges(@{DOCustomGlassNavigationPlaybackRateKey:@(clampedRate)})) {
+        DOCustomGlassPresentMediaImportError(self.topViewController, @"Glass_Media_Save_Failed");
+        return;
+    }
 
     [self customGlassResumeVideoWallpaperPlayback];
 }

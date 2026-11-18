@@ -3,6 +3,8 @@
 #import <QuartzCore/QuartzCore.h>
 #import <math.h>
 
+void DOCustomGlassPresentMediaImportError(UIViewController *controller, NSString *messageKey);
+
 @interface UINavigationController (DOCustomGlassSharedBackground)
 - (void)customGlassRefreshSharedBackground;
 - (void)customGlassReplaceSharedBackgroundWithImage:(UIImage *)image;

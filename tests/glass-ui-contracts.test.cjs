@@ -186,11 +186,11 @@ test('username and motto editors use saved user input rather than treating place
   const username = section(main, '- (void)presentCustomGlassUsernameEditor', '- (void)customGlassUsernameTextChanged:');
   assert.match(username, /currentUsername = \[NSUserDefaults\.standardUserDefaults stringForKey:DOCustomGlassUsernameKey\] \?: @""/);
   assert.match(username, /textField\.text = currentUsername/);
-  assert.match(username, /setObject:username forKey:DOCustomGlassUsernameKey/);
+  assert.match(username, /DOCustomGlassThemeSyncCommitChanges\(@\{DOCustomGlassUsernameKey:username\}\)/);
   const motto = section(main, '- (void)presentCustomGlassMottoEditor', '- (void)customGlassMottoTextChanged:');
   assert.match(motto, /currentMotto = \[NSUserDefaults\.standardUserDefaults stringForKey:DOCustomGlassMottoKey\] \?: @""/);
   assert.match(motto, /textField\.text = currentMotto/);
-  assert.match(motto, /setObject:motto forKey:DOCustomGlassMottoKey/);
+  assert.match(motto, /DOCustomGlassThemeSyncCommitChanges\(@\{DOCustomGlassMottoKey:motto\}\)/);
   assert.match(main, /initWithTarget:self action:@selector\(presentCustomGlassUsernameEditor\)/);
   assert.match(main, /initWithTarget:self action:@selector\(presentCustomGlassMottoEditor\)/);
 });
@@ -322,7 +322,7 @@ test('orphan cleanup is deferred until theme bootstrap and only unlinks old gene
     assert.ok(cleanup.includes(token), token);
   assert.doesNotMatch(cleanup, /removeItemAt|enumeratorAt|AT_REMOVEDIR/);
   const references = section(media, 'static inline NSSet<NSString *> *DOCustomGlassMediaStoreReferencedFiles', 'static inline NSUInteger DOCustomGlassMediaStorePruneOrphans');
-  assert.match(references, /dictionaryWithContentsOfFile:DOCustomGlassThemeSyncPath\(\)/);
+  assert.match(references, /DOCustomGlassThemeSyncRead\(\)/);
   assert.match(references, /objectForKey:key/);
   assert.match(media, /OBJC_ASSOCIATION_RETAIN_NONATOMIC/);
 });
@@ -335,6 +335,48 @@ test('blur coalesces unchanged inputs and cancels obsolete work before rendering
   assert.match(blur, /generation != strongSelf\.customGlassBackgroundBlurGeneration/);
   assert.match(blur, /sourceImage != strongSelf\.customGlassBackgroundSourceImage/);
   assert.match(navigation, /customGlassPauseForJailbreak[\s\S]*?cancelAllOperations/);
+});
+
+test('signed-install media access retries only active jailbreak scopes and never caches a failed container', () => {
+  const retry = section(sync, 'static inline void DOCustomGlassThemeSyncRetryAccess', 'static inline NSDictionary *DOCustomGlassThemeSyncRead');
+  assert.match(retry, /isInstalledThroughTrollStore.*!.*isJailbroken/);
+  assert.ok(retry.indexOf('runAsRoot:') < retry.indexOf('runUnsandboxed:'));
+  assert.match(retry, /@try \{ operation\(\); \}/);
+  assert.doesNotMatch(retry, /dispatch_async|dispatch_after/);
+  const container = section(media, 'static inline NSURL *DOCustomGlassMediaStoreContainerURL', 'static inline NSURL *DOCustomGlassMediaStoreDirectoryURL');
+  assert.doesNotMatch(container, /dispatch_once/);
+  assert.match(container, /SandboxContainerURL\(NSHomeDirectory\(\)\)/);
+});
+
+test('picker dismissal completes before import; failed Live Photos preserve the old wallpaper', () => {
+  for (const [source, method] of [[main, 'Avatar'], [components, 'Wallpaper']]) {
+    const picker = section(source, '- (void)picker:', '- (void)importCustomGlass');
+    assert.match(picker, /dismissViewControllerAnimated:YES completion:\^\{/);
+    assert.ok(picker.includes('importCustomGlass' + method + 'Result:'));
+    assert.match(source, /Glass_Media_Load_Failed/);
+    assert.match(source, /Glass_Media_Save_Failed/);
+    assert.match(source, /Glass_Media_Authorization_Required/);
+  }
+  const live = section(components, '// Detect Live Photo before', '    importStaticImage();\n}');
+  assert.doesNotMatch(live, /importStaticImage\(\)/);
+  assert.match(live, /Glass_Media_LivePhoto_Failed/);
+  for (const locale of ['en', 'zh-Hans', 'zh-CN'])
+    for (const key of ['Import_Failed', 'Load_Failed', 'Save_Failed', 'Authorization_Required', 'LivePhoto_Failed'])
+      assert.ok(read('Application/Dopamine/' + locale + '.lproj/Localizable.strings').includes('"Glass_Media_' + key + '"'));
+});
+
+test('glass edits commit before presentation and refresh authorization after returning to foreground', () => {
+  const preview = section(components, '- (void)applyAppearancePreviewAndPersist:(BOOL)persist\n{', '- (void)restoreRecommendedAppearanceValues');
+  assert.ok(preview.indexOf('DOCustomGlassThemeSyncCommitChanges') < preview.indexOf('customGlassApplySharedBackgroundBlurIntensity:'));
+  assert.match(preview, /if \(DOUsesCustomGlassTheme\(\)\)/);
+  assert.doesNotMatch(components, /setFloat:.*forKey:DOCustomGlass/);
+  assert.match(components, /name:UIApplicationDidBecomeActiveNotification/);
+  const gate = section(components, '- (BOOL)requireCustomGlassSupporterAuthorization', '- (DOCustomLiquidGlassView *)themeGlassView');
+  assert.doesNotMatch(gate, /if \(!self.supporterAuthorizationKnown\)/);
+  const appeared = section(main, '- (void)viewDidAppear:', '// 释放定时器');
+  assert.match(appeared, /refreshHomePresentationIfNeeded/);
+  const text = section(main, '- (void)customGlassUsernameTextChanged:', '- (DOCustomLiquidGlassView *)customGlassViewWithCornerRadius:');
+  assert.equal((text.match(/markedTextRange/g) || []).length, 2);
 });
 
 test('maintenance uses upstream void actions and restores the faded interface when they return', () => {
@@ -362,7 +404,8 @@ test('native Foundation media transactions preserve old files on write failure a
     const theme = sync.replace(
       /static NSString \* const DOCustomGlassThemeSyncDirectory =\s*@"[^"]+";/,
       'static NSString *DOCustomGlassThemeSyncDirectory;',
-    ).replace(/\bNSUserDefaults\b/g, 'TestDefaults').replace(/^#pragma once$/gm, '');
+    ).replace('#import "DOEnvironmentManager.h"', '')
+      .replace(/\bNSUserDefaults\b/g, 'TestDefaults').replace(/^#pragma once$/gm, '');
     const store = (media.slice(0, media.indexOf('static inline id DOCustomGlassMediaStoreCallObjectGetter')) +
       `static inline NSURL *DOCustomGlassMediaStoreContainerURL(void) {
         return [NSURL fileURLWithPath:testRoot];
@@ -401,7 +444,10 @@ void otherRelease(NSString *filename);
 }
 @end
 static NSData *UIImageJPEGRepresentation(UIImage *image, double quality) { return image.data; }
+${read('tests/helpers/glass-theme-access.m')}
 ${theme}
+${section(main, 'static NSString *DOCustomGlassLimitedText', '@interface DOMainViewController')}
+${section(media, 'static inline NSURL *DOCustomGlassMediaStoreSandboxContainerURL', 'static inline NSURL *DOCustomGlassMediaStoreContainerURL')}
 ${store}
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "check failed at line %d\\n", __LINE__); return 1; } } while (0)
 static NSProgress *request(void) { return [NSProgress progressWithTotalUnitCount:1]; }
@@ -420,6 +466,21 @@ int main(int argc, char **argv) { @autoreleasepool {
   testRoot = [NSString stringWithUTF8String:argv[1]];
   DOCustomGlassThemeSyncDirectory = [testRoot stringByAppendingPathComponent:@"theme"];
   NSString *goodDirectory = DOCustomGlassThemeSyncDirectory;
+  NSUInteger characterCount = 0;
+  CHECK([DOCustomGlassLimitedText(@"1234567890123456789😀Z", 20, &characterCount) isEqual:@"1234567890123456789😀"]);
+  CHECK(characterCount == 20);
+  CHECK([DOCustomGlassLimitedText(@"👨‍👩‍👧‍👦中文", 2, &characterCount) isEqual:@"👨‍👩‍👧‍👦中"]);
+  CHECK(characterCount == 2);
+  CHECK([DOCustomGlassLimitedText(@"é🇨🇳x", 2, &characterCount) isEqual:@"é🇨🇳"]);
+  CHECK([DOCustomGlassLimitedText(@"", 20, &characterCount) isEqual:@""] && characterCount == 0);
+  accessDirectory = goodDirectory;
+  installGlassAccessSimulation();
+  NSString *validHome = @"/var/mobile/Containers/Data/Application/12345678-1234-1234-1234-123456789ABC";
+  CHECK(DOCustomGlassMediaStoreSandboxContainerURL(validHome));
+  CHECK(DOCustomGlassMediaStoreSandboxContainerURL([@"/private" stringByAppendingString:validHome]));
+  for (NSString *invalidHome in @[@"/var/mobile", @"/var/root", @"/tmp/12345678-1234-1234-1234-123456789ABC",
+      @"/var/mobile/Containers/Data/Application/not-a-uuid", [validHome stringByAppendingPathComponent:@"Library"]])
+    CHECK(!DOCustomGlassMediaStoreSandboxContainerURL(invalidHome));
   NSUserDefaults *defaults = TestDefaults.standardUserDefaults;
   NSURL *movie = [NSURL fileURLWithPath:[testRoot stringByAppendingPathComponent:@"source.mov"]];
   [@"video" writeToURL:movie atomically:YES encoding:NSUTF8StringEncoding error:nil];
@@ -432,6 +493,51 @@ int main(int argc, char **argv) { @autoreleasepool {
   CHECK([external[DOCustomGlassMediaStoreWallpaperFilenameKey] isEqual:poster]);
   CHECK([external[DOCustomGlassMediaStoreWallpaperVideoFilenameKey] isEqual:video]);
   NSSet *before = files();
+  CHECK(rootAttempts == 0);
+  denyOrdinary = YES;
+  CHECK(!DOCustomGlassMediaStoreSaveWallpaper(image(@"denied-before-jailbreak"), request(), NULL));
+  CHECK(rootAttempts == 0 && [files() isEqual:before]);
+  jailbreakActive = YES;
+  CHECK(!DOCustomGlassMediaStoreSaveWallpaper(image(@"denied-root"), request(), NULL));
+  CHECK(rootAttempts > 0 && [files() isEqual:before]);
+  CHECK([[defaults stringForKey:DOCustomGlassMediaStoreWallpaperFilenameKey] isEqual:poster]);
+  allowRoot = YES;
+  CHECK([DOCustomGlassThemeSyncRead() isEqual:external]);
+  CHECK(DOCustomGlassMediaStoreSaveWallpaper(image(@"signed-still"), request(), NULL));
+  CHECK(!exists(video) && !exists(poster));
+  CHECK(DOCustomGlassMediaStoreSaveWallpaperVideo(movie, image(@"signed-poster"), request(), NULL));
+  CHECK(DOCustomGlassMediaStoreSaveAvatar(image(@"signed-avatar"), request(), NULL));
+  CHECK(!exists(avatar));
+  avatar = [defaults stringForKey:DOCustomGlassMediaStoreAvatarFilenameKey];
+  poster = [defaults stringForKey:DOCustomGlassMediaStoreWallpaperFilenameKey];
+  video = [defaults stringForKey:DOCustomGlassMediaStoreWallpaperVideoFilenameKey];
+  external = DOCustomGlassThemeSyncRead();
+  CHECK([external[DOCustomGlassMediaStoreWallpaperFilenameKey] isEqual:poster]);
+  CHECK([external[DOCustomGlassMediaStoreWallpaperVideoFilenameKey] isEqual:video]);
+  CHECK([external[DOCustomGlassMediaStoreAvatarFilenameKey] isEqual:avatar]);
+  CHECK(!rootScope && !unsandboxedScope);
+  throwAccess = YES;
+  CHECK(!DOCustomGlassThemeSyncRead() && !rootScope && !unsandboxedScope);
+  throwAccess = NO;
+  NSDictionary *appearanceChanges = @{
+      @"DOCustomGlassTheme.Username":@"测试😀",
+      @"DOCustomGlassTheme.Motto":@"保留旧值",
+      @"DOCustomGlassTheme.BackgroundBlur":@0.25
+  };
+  CHECK(DOCustomGlassThemeSyncCommitChanges(appearanceChanges));
+  external = DOCustomGlassThemeSyncRead();
+  for (NSString *key in appearanceChanges)
+    CHECK([external[key] isEqual:appearanceChanges[key]] && [[defaults objectForKey:key] isEqual:appearanceChanges[key]]);
+  allowRoot = NO;
+  CHECK(!DOCustomGlassThemeSyncCommitChanges(@{@"DOCustomGlassTheme.Username":@"discard"}));
+  CHECK([[defaults objectForKey:@"DOCustomGlassTheme.Username"] isEqual:appearanceChanges[@"DOCustomGlassTheme.Username"]]);
+  allowRoot = YES;
+  denyOrdinary = NO;
+  installedThroughTrollStore = YES;
+  NSUInteger attempts = rootAttempts;
+  CHECK(DOCustomGlassThemeSyncWrite(external) && rootAttempts == attempts);
+  installedThroughTrollStore = NO;
+  before = files();
 
   // A non-directory at the destination makes authoritative commits fail.
   DOCustomGlassThemeSyncDirectory = [testRoot stringByAppendingPathComponent:@"blocked"];
@@ -470,10 +576,14 @@ int main(int argc, char **argv) { @autoreleasepool {
 
   // Restart reconstructs local references from the committed external state.
   [defaults setObject:@"stale.jpg" forKey:DOCustomGlassMediaStoreWallpaperFilenameKey];
+  denyOrdinary = YES;
   DOCustomGlassThemeSyncBootstrap();
   CHECK([[defaults stringForKey:DOCustomGlassMediaStoreWallpaperFilenameKey] isEqual:winner]);
   CHECK(exists(winner) && files().count == 2);
   CHECK(DOCustomGlassMediaStoreActiveFiles().count == 0);
+  CHECK(!rootScope && !unsandboxedScope);
+  CHECK([[defaults objectForKey:@"DOCustomGlassTheme.Username"] isEqual:@"测试😀"]);
+  denyOrdinary = NO;
 
   // Only old, known UUID files are disposable. Preserve both reference stores.
   for (NSString *name in @[winner, avatar])
@@ -505,12 +615,15 @@ int main(int argc, char **argv) { @autoreleasepool {
   CHECK([NSFileManager.defaultManager createSymbolicLinkAtPath:DOCustomGlassMediaStoreFileURL(link).path
     withDestinationPath:movie.path error:nil]);
   DOCustomGlassMediaStoreReleaseFilename(link);
+  denyOrdinary = YES;
   CHECK(DOCustomGlassMediaStorePruneOrphans() == 3);
   CHECK(!exists(abandoned) && !exists(oldVideo) && !exists(oldPoster));
   CHECK(exists(winner) && exists(localOnly) && exists(avatar) && exists(fresh) && exists(active));
   CHECK(exists(unknown) && exists(subdirectory) && exists(link));
   otherRelease(active);
   CHECK(DOCustomGlassMediaStorePruneOrphans() == 1 && !exists(active));
+  CHECK(!rootScope && !unsandboxedScope);
+  denyOrdinary = NO;
 
   // Invalid/missing reference state must stop cleanup, not act like an empty set.
   NSString *recoverable = orphan(@"avatar", @"jpg", YES);

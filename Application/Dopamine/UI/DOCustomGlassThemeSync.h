@@ -16,6 +16,7 @@
 #pragma once
 
 #import <Foundation/Foundation.h>
+#import "DOEnvironmentManager.h"
 
 static NSString * const DOCustomGlassThemeSyncPrefix = @"DOCustomGlassTheme.";
 static NSString * const DOCustomGlassThemeSyncDirectory =
@@ -42,13 +43,42 @@ static inline NSDictionary<NSString *, id> *DOCustomGlassThemeSyncLocalSnapshot(
     return snapshot;
 }
 
-static inline BOOL DOCustomGlassThemeSyncWrite(NSDictionary<NSString *, id> *state)
+// Only synchronous file I/O runs in the existing ZQBB access scope. Catch
+// Foundation exceptions inside it so upstream always restores credentials.
+static inline void DOCustomGlassThemeSyncRetryAccess(void (^operation)(void))
+{
+    DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
+    if ([environment isInstalledThroughTrollStore] || ![environment isJailbroken])
+        return;
+    [environment runAsRoot:^{
+        [environment runUnsandboxed:^{
+            @try { operation(); }
+            @catch (NSException *exception) {
+                NSLog(@"[CustomGlass][ThemeSync] access exception: %@", exception.name);
+            }
+        }];
+    }];
+}
+
+static inline NSDictionary *DOCustomGlassThemeSyncRead(void)
+{
+    __block NSDictionary *state = [NSDictionary dictionaryWithContentsOfFile:DOCustomGlassThemeSyncPath()];
+    if (!state) {
+        DOCustomGlassThemeSyncRetryAccess(^{
+            state = [NSDictionary dictionaryWithContentsOfFile:DOCustomGlassThemeSyncPath()];
+        });
+    }
+    return state;
+}
+
+static inline BOOL DOCustomGlassThemeSyncWriteDirect(NSDictionary<NSString *, id> *state)
 {
     @try {
-        [[NSFileManager defaultManager] createDirectoryAtPath:DOCustomGlassThemeSyncDirectory
+        BOOL directoryReady = [[NSFileManager defaultManager] createDirectoryAtPath:DOCustomGlassThemeSyncDirectory
                                   withIntermediateDirectories:YES
                                                    attributes:nil
                                                         error:nil];
+        if (!directoryReady) return NO;
         NSMutableDictionary *payload = [state mutableCopy];
         payload[DOCustomGlassThemeSyncVersionKey] = @1;
         BOOL ok = [payload writeToFile:DOCustomGlassThemeSyncPath() atomically:YES];
@@ -59,6 +89,17 @@ static inline BOOL DOCustomGlassThemeSyncWrite(NSDictionary<NSString *, id> *sta
         NSLog(@"[CustomGlass][ThemeSync] write exception: %@", e);
         return NO;
     }
+}
+
+static inline BOOL DOCustomGlassThemeSyncWrite(NSDictionary<NSString *, id> *state)
+{
+    __block BOOL written = DOCustomGlassThemeSyncWriteDirect(state);
+    if (!written) {
+        DOCustomGlassThemeSyncRetryAccess(^{
+            written = DOCustomGlassThemeSyncWriteDirect(state);
+        });
+    }
+    return written;
 }
 
 static BOOL gDOCustomGlassThemeSyncApplying = NO;
@@ -100,7 +141,7 @@ static inline void DOCustomGlassThemeSyncFlush(void)
     @synchronized(NSUserDefaults.class) {
         gDOCustomGlassThemeSyncPending = NO;
         NSDictionary *snapshot = DOCustomGlassThemeSyncLocalSnapshot();
-        NSDictionary *external = [NSDictionary dictionaryWithContentsOfFile:DOCustomGlassThemeSyncPath()];
+        NSDictionary *external = DOCustomGlassThemeSyncRead();
         if ([external isKindOfClass:NSDictionary.class]) {
             NSMutableDictionary *themeOnly = [external mutableCopy];
             [themeOnly removeObjectForKey:DOCustomGlassThemeSyncVersionKey];
@@ -119,8 +160,7 @@ static inline void DOCustomGlassThemeSyncBootstrap(void)
         @try {
             NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
             NSDictionary<NSString *, id> *local = DOCustomGlassThemeSyncLocalSnapshot();
-            NSDictionary *external =
-                [NSDictionary dictionaryWithContentsOfFile:DOCustomGlassThemeSyncPath()];
+            NSDictionary *external = DOCustomGlassThemeSyncRead();
 
             BOOL authoritative = [external isKindOfClass:NSDictionary.class] &&
                                  external[DOCustomGlassThemeSyncVersionKey] != nil;

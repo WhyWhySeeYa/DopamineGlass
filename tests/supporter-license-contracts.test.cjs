@@ -530,7 +530,7 @@ test('device diagnostics disclose persistent key creation and never expose ident
 test('authorization limits the glass theme while standalone jailbreak and maintenance remain available', () => {
   assert.match(themeManager, /if \(!\[value isKindOfClass:NSString\.class\]\)\s*value = DODefaultThemeKey/);
   assert.match(themeManager, /if \(\[value isEqualToString:DOCustomGlassThemeKey\] && !supporterVerified\)/);
-  assert.match(themeManager, /setPreferenceValue:value forKey:@"theme"/);
+  assert.doesNotMatch(objcMethod(themeManager, '- (DOTheme*)enabledTheme'), /setPreferenceValue/);
   assert.match(themeManager, /getThemeForKey:DODefaultThemeKey/);
   assert.match(themeManager, /theme\.key isEqualToString:DOCustomGlassThemeKey.*!supporterVerified/s);
 
@@ -703,7 +703,7 @@ int main(void) { @autoreleasepool {
       CHECK([[manager enabledTheme].key isEqualToString:expected]);
       CHECK([[manager getAvailableThemeKeys] containsObject:@"custom_glass"] == authorized);
       CHECK([[manager getAvailableThemeKeys] isEqual:[manager getAvailableThemeNames]]);
-      CHECK(preferences.writes == ([selected isEqual:@"custom_glass"] && !authorized ? 1 : 0));
+      CHECK(preferences.writes == 0);
       CHECK(DOUsesCustomGlassTheme() == (authorized && [expected isEqualToString:@"custom_glass"]));
     }
   }
@@ -711,10 +711,10 @@ int main(void) { @autoreleasepool {
   CHECK([[manager enabledTheme].key isEqualToString:@"custom_glass"]);
   authorized = NO;
   CHECK([[manager enabledTheme].key isEqualToString:@"default"]);
-  CHECK([preferences.value isEqual:@"default"]);
+  CHECK([preferences.value isEqual:@"custom_glass"]);
   authorized = YES;
-  CHECK([[manager enabledTheme].key isEqualToString:@"default"]);
-  CHECK(!DOUsesCustomGlassTheme());
+  CHECK([[manager enabledTheme].key isEqualToString:@"custom_glass"]);
+  CHECK(DOUsesCustomGlassTheme());
   return 0;
 } }
 `);

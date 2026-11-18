@@ -101,18 +101,34 @@ static inline NSURL *DOCustomGlassMediaStoreMCMContainerURL(NSString *bundleIden
     return url;
 }
 
+static inline NSURL *DOCustomGlassMediaStoreSandboxContainerURL(NSString *home)
+{
+    // Normal signed installs may not query LS/MCM. Accept HOME only when it
+    // is an actual iOS App Data Container, never /var/mobile or /var/root.
+    NSString *path = home.stringByStandardizingPath;
+    if ([path hasPrefix:@"/private/var/"]) path = [path substringFromIndex:8];
+    NSString *parent = path.stringByDeletingLastPathComponent;
+    if (![parent isEqualToString:@"/var/mobile/Containers/Data/Application"] ||
+        ![[NSUUID alloc] initWithUUIDString:path.lastPathComponent])
+        return nil;
+    return [NSURL fileURLWithPath:home isDirectory:YES];
+}
+
 static inline NSURL *DOCustomGlassMediaStoreContainerURL(void)
 {
     static NSURL *resolvedURL = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
+    @synchronized(NSUserDefaults.class) {
+        if (resolvedURL) return resolvedURL;
         NSString *bundleIdentifier = NSBundle.mainBundle.bundleIdentifier;
         if (bundleIdentifier.length == 0)
-            return;
+            return nil;
+
+        resolvedURL = DOCustomGlassMediaStoreSandboxContainerURL(NSHomeDirectory());
 
         // LaunchServices describes the installed app registration and exposes
         // its real dataContainerURL without depending on process HOME.
-        resolvedURL = DOCustomGlassMediaStoreLSContainerURL(bundleIdentifier);
+        if (!resolvedURL)
+            resolvedURL = DOCustomGlassMediaStoreLSContainerURL(bundleIdentifier);
 
         // MCM is a second explicit bundle-id -> data-container resolver.
         if (!resolvedURL)
@@ -123,8 +139,9 @@ static inline NSURL *DOCustomGlassMediaStoreContainerURL(void)
         else
             NSLog(@"[CustomGlass][MediaStore] failed to resolve App Data Container for %@",
                   bundleIdentifier);
-    });
-    return resolvedURL;
+        // Do not cache an early denied lookup for the entire process.
+        return resolvedURL;
+    }
 }
 
 static inline NSURL *DOCustomGlassMediaStoreDirectoryURL(void)
@@ -212,7 +229,7 @@ static inline BOOL DOCustomGlassMediaStoreIsGeneratedFilename(NSString *filename
 // Nil means the reference state cannot safely authorize any deletion.
 static inline NSSet<NSString *> *DOCustomGlassMediaStoreReferencedFiles(void)
 {
-    NSDictionary *external = [NSDictionary dictionaryWithContentsOfFile:DOCustomGlassThemeSyncPath()];
+    NSDictionary *external = DOCustomGlassThemeSyncRead();
     id version = external[DOCustomGlassThemeSyncVersionKey];
     if (![version isKindOfClass:NSNumber.class] || ![version isEqual:@1]) return nil;
     NSMutableSet *referenced = [NSMutableSet set];

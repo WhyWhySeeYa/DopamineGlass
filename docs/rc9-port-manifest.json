@@ -12,17 +12,14 @@
     "commit": "f6295a208781974b09227eeab9723dc180329f71",
     "importedAt": "2026-11-17",
     "unchangedRuntimeFiles": {
-      "Application/Dopamine/UI/DOCustomGlassMediaStore.h": "c8b3c36074502153e7d0919bc6d4df43e941218f7a27eba4795e1ee7f39e79bc",
-      "Application/Dopamine/UI/DOCustomGlassThemeSync.h": "2fd14c17cbc326b90f64033af7faf065f964223940abea346d28fa10291c3657",
-      "Application/Dopamine/UI/DOCustomGlassView.h": "dc2169ba87404ce212422d4dd65298798443fc721a24d9c856f5474c22ae19e8",
       "Application/Dopamine/UI/DOSupporterBinding.h": "24f96a7e617d6b0f9024cd2c04311d3a2944d93033399e4527fec5801b03ffa6",
       "Application/Dopamine/UI/DOSupporterRenderAuthorization.h": "520c79ee9dd132f552284447cea98740d7ac2f1593e90038cc63b86e9acaee12"
     },
     "runtimeAdaptations": {
       "Application/Dopamine/UI/DOCustomGlassView.m": {
         "sourceSha256": "3b10886527061f217b0ab015274309680c0de662b80732865ef2637c90a37108",
-        "adaptedSha256": "26bb43f61c59f35c930c9e92c375accbb9f87d516e5bea1d2571be276d1e0885",
-        "reason": "Render glass only for an authorized, explicitly selected custom_glass theme; otherwise use the upstream stock UI path."
+        "adaptedSha256": "d21efb1de0d9c00828aa05857b9f04ca7c8a2dad1163af4f5064b2617667cadd",
+        "reason": "Glass editing: preserve RC9 rendering and controls; add import failure feedback, atomic parameter commits and authorization lifecycle refresh."
       },
       "Application/Dopamine/UI/DOSupporterLicense.h": {
         "sourceSha256": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
@@ -33,6 +30,21 @@
         "sourceSha256": "0c88f214d7ac30e9356f7ecb96cfbf99ec7db46660a9f82c062913af9d776d85",
         "adaptedSha256": "66966506e6d932cf120a5aba7636fa33916ad624aedad28439b9d4fb3e84b006",
         "reason": "Custom Glass authorization: show hardware-access prerequisites and distinguish verified-but-unsaved activation from invalid licenses."
+      },
+      "Application/Dopamine/UI/DOCustomGlassMediaStore.h": {
+        "sourceSha256": "c8b3c36074502153e7d0919bc6d4df43e941218f7a27eba4795e1ee7f39e79bc",
+        "adaptedSha256": "1f30ae813d54ce50813a93fb8f84415cc05f7928f59983d5828658d32445b702",
+        "reason": "Glass media: accept validated sandbox container HOME, retry denied container lookup, and read authoritative references through the ZQBB access adapter."
+      },
+      "Application/Dopamine/UI/DOCustomGlassThemeSync.h": {
+        "sourceSha256": "2fd14c17cbc326b90f64033af7faf065f964223940abea346d28fa10291c3657",
+        "adaptedSha256": "5c6a5176d245455112a0b6c62f7cc283acd7613081e98cc49d2cb7410abf005c",
+        "reason": "Glass persistence: retry denied external plist access using existing active ZQBB scopes; keep RC9 paths, format and atomic commit order."
+      },
+      "Application/Dopamine/UI/DOCustomGlassView.h": {
+        "sourceSha256": "dc2169ba87404ce212422d4dd65298798443fc721a24d9c856f5474c22ae19e8",
+        "adaptedSha256": "ffda726d311abe72019346e639b9bb3b3778c6eb698d7706f003c5b18b5ec634",
+        "reason": "Glass UI: declare shared import and save failure feedback."
       }
     }
   },
