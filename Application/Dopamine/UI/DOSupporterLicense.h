@@ -1438,10 +1438,28 @@ static inline NSString *DORHSupporterPersistentStatePath(void)
         stringByAppendingPathComponent:DORHSupporterPersistentStateFilename];
 }
 
+// RC9 stores outside the App container. On signed ZQBB installations, use
+// the existing environment access scope for file I/O only, after an ordinary
+// read/write fails. Keep the RC9 path, plist, and authorization logic intact.
+static inline void DORHSupporterRetryPersistentAccess(void (^operation)(void))
+{
+    DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
+    if ([environment isInstalledThroughTrollStore] || ![environment isJailbroken])
+        return;
+    [environment runAsRoot:^{
+        [environment runUnsandboxed:operation];
+    }];
+}
+
 static inline NSMutableDictionary<NSString *, id> *DORHSupporterReadPersistentState(void)
 {
-    NSDictionary *state =
+    __block NSDictionary *state =
         [NSDictionary dictionaryWithContentsOfFile:DORHSupporterPersistentStatePath()];
+    if (!state) {
+        DORHSupporterRetryPersistentAccess(^{
+            state = [NSDictionary dictionaryWithContentsOfFile:DORHSupporterPersistentStatePath()];
+        });
+    }
 
     if (![state isKindOfClass:NSDictionary.class])
         return [NSMutableDictionary dictionary];
@@ -1449,7 +1467,7 @@ static inline NSMutableDictionary<NSString *, id> *DORHSupporterReadPersistentSt
     return [state mutableCopy];
 }
 
-static inline BOOL DORHSupporterWritePersistentState(NSDictionary<NSString *, id> *state)
+static inline BOOL DORHSupporterWritePersistentStateDirect(NSDictionary<NSString *, id> *state)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
 
@@ -1473,6 +1491,17 @@ static inline BOOL DORHSupporterWritePersistentState(NSDictionary<NSString *, id
     if (!written)
         NSLog(@"[Supporter] unable to write persistent supporter state");
 
+    return written;
+}
+
+static inline BOOL DORHSupporterWritePersistentState(NSDictionary<NSString *, id> *state)
+{
+    __block BOOL written = DORHSupporterWritePersistentStateDirect(state);
+    if (!written) {
+        DORHSupporterRetryPersistentAccess(^{
+            written = DORHSupporterWritePersistentStateDirect(state);
+        });
+    }
     return written;
 }
 

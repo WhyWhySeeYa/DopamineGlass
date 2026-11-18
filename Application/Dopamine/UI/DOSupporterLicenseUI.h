@@ -154,9 +154,12 @@ static inline void DORHPresentSupporterLicense(UIViewController *presenter)
                 DOLocalizedString(@"Supporter_Activated"),
                 DOLocalizedString(@"Supporter_Activated_Message"));
         } else {
+            BOOL storageFailure = [error.domain isEqualToString:DORHSupporterLicenseErrorDomain] &&
+                (error.code == 9 || error.code == 28);
             DORHShowSupporterMessage(weakPresenter,
-                DOLocalizedString(@"Supporter_Invalid_License"),
-                error.localizedDescription ?: DOLocalizedString(@"Supporter_Invalid_License_Fallback"));
+                DOLocalizedString(storageFailure ? @"Supporter_Save_Failed" : @"Supporter_Invalid_License"),
+                storageFailure ? DOLocalizedString(@"Supporter_Save_Failed_Message") :
+                    (error.localizedDescription ?: DOLocalizedString(@"Supporter_Invalid_License_Fallback")));
         }
     }]];
 

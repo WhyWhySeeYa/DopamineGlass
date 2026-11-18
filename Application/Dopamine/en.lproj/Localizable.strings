@@ -204,3 +204,6 @@
 "Supporter_Key_State_Reused" = "Existing key reused";
 "Maintenance_Failed" = "The system operation failed (error %d). You can try again.";
 "Button_Back" = "Back";
+
+"Supporter_Save_Failed" = "Unable to save license";
+"Supporter_Save_Failed_Message" = "The license was verified, but could not be saved. Complete the jailbreak, reopen this app and paste the same license again. You do not need a new license.";

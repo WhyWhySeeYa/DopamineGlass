@@ -86,13 +86,14 @@ test('hardware identity fallback reads only the same ECID and retains actionable
   assert.match(licenseUI, /hardware\[@"stage"\] \?: @"hardware-identity"/);
 });
 
-test('hardware access changes preserve every frozen license operation except diagnostic propagation', () => {
+test('access adapters preserve RC9 license operations outside the persistence I/O adapter', () => {
   const tail = source.slice(source.indexOf('// Phase 2A Device Key'))
+    .replace(/static inline NSString [*]DORHSupporterPersistentStatePath[(]void[)][\s\S]*?(?=static inline NSString [*]DORHSupporterPersistentString)/, '')
     .replace('*failureStage = hardware[@"stage"] ?: @"hardware-identity";', '*failureStage = @"hardware-identity";')
     .replace('*failureCode = hardware[@"error_code"] ? [hardware[@"error_code"] integerValue] : -1;', '*failureCode = -1;')
     .replace(/\r\n/g, '\n').trim();
   assert.equal(require('node:crypto').createHash('sha256').update(tail).digest('hex'),
-    '53b111a9aef0a6549b861f46a2d5daa52312de4e9a94c2e61f45c5a620bf802c');
+    'a2d6dda5d505ebe32761793e5da9fb85fd55680d7233ddec5e19252ed3b23e45');
 });
 
 test('native Foundation executes hardware identity fallback, canonical hashes and failure diagnostics', {
@@ -393,6 +394,30 @@ test('supporter state keeps stable legacy keys and an external removal tombstone
     '@"LicenseRemoved"',
   ]) {
     assert.ok(source.includes(value), `Missing compatibility key: ${value}`);
+  }
+});
+
+test('native Foundation saves, reloads and removes RC9 state through signed-install access', {
+  skip: process.platform !== 'darwin' && 'Requires macOS Foundation; file access restrictions are doubled, production persistence and activation/removal execute.',
+}, () => {
+  const directory = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'rh-persistence-'));
+  try {
+    const harness = fs.readFileSync(path.join(root, 'tests/helpers/supporter-persistence-main.m'), 'utf8')
+      .replace('__PERSISTENCE_SOURCE__', section(source, 'static inline NSString *DORHSupporterPersistentStatePath', 'static inline NSString *DORHSupporterEmbeddedDeviceCode'))
+      .replace('__STORE_SOURCE__', section(source, 'static inline BOOL DORHSupporterStoreLicenseCode', 'static inline BOOL DORHSupporterStoreActivationText'))
+      .replace('__REMOVE_SOURCE__', source.slice(source.indexOf('static inline BOOL DORHSupporterRemoveLicense')));
+    const file = path.join(directory, 'main.m');
+    const executable = path.join(directory, 'persistence-test');
+    fs.writeFileSync(file, harness);
+    for (const [command, args] of [
+      ['xcrun', ['clang', '-fobjc-arc', '-framework', 'Foundation', file, '-o', executable]],
+      [executable, [path.join(directory, 'state')]],
+    ]) {
+      const result = spawnSync(command, args, { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });
 

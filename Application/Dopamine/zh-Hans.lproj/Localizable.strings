@@ -199,3 +199,6 @@
 "Supporter_Key_State_Reused" = "复用现有密钥";
 "Maintenance_Failed" = "系统操作失败（错误 %d），可以重新尝试。";
 "Button_Back" = "返回";
+
+"Supporter_Save_Failed" = "授权保存失败";
+"Supporter_Save_Failed_Message" = "授权已通过校验，但未能保存。请完成越狱并重新打开本应用，再粘贴同一份授权码，无需重新签发。";
