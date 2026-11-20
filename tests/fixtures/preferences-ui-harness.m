@@ -318,11 +318,21 @@ static NSUInteger CheckAuthorizationBoundary(UIViewController *host)
     return checks + 1;
 }
 
+static void HarnessProgress(NSString *stage)
+{
+    NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *path = [documents stringByAppendingPathComponent:@"progress.log"];
+    NSString *previous = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    [[previous stringByAppendingFormat:@"%@ %@\n", NSDate.date, stage]
+        writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+}
+
 /* HOME_FOCUS_FIXTURE */
 /* SCHEDULE_UI_FIXTURE */
 
 static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
 {
+    HarnessProgress(@"stock modal return");
     CheckStockModalReturn(host);
     NSUInteger checks = 0, viewports = 0;
     NSArray<NSValue *> *sizes = @[
@@ -336,6 +346,7 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
         [host.view addSubview:page.view];
         [page didMoveToParentViewController:host];
         for (NSValue *value in sizes) {
+            HarnessProgress([NSString stringWithFormat:@"%@ %@", NSStringFromClass(pageClass), NSStringFromCGSize(value.CGSizeValue)]);
             page.view.frame = (CGRect){CGPointZero, value.CGSizeValue};
             Layout(page);
             UITableView *table = page->_table;
@@ -372,9 +383,13 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
         [page.view removeFromSuperview];
         [page removeFromParentViewController];
     }
+    HarnessProgress(@"authorization boundaries");
     NSUInteger boundaryChecks = CheckAuthorizationBoundary(host);
+    HarnessProgress(@"home");
     NSUInteger homeFocusCases = CheckHomeFocus(host);
+    HarnessProgress(@"schedule");
     NSUInteger scheduleUICases = CheckScheduleUI(host, documents);
+    HarnessProgress(@"completed");
     return @{@"status": @"passed", @"viewports": @(viewports), @"scrollChecks": @(checks),
         @"authorizationBoundaryChecks": @(boundaryChecks),
         @"homeFocusCases": @(homeFocusCases), @"scheduleUICases": @(scheduleUICases),

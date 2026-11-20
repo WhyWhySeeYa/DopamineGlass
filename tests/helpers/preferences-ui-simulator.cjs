@@ -129,11 +129,13 @@ async function run() {
     const deadline = Date.now() + 90000;
     while (!fs.existsSync(report) && Date.now() < deadline)
       await new Promise(resolve => setTimeout(resolve, 1000));
-    assert.ok(fs.existsSync(report), 'UIKit harness timed out or crashed before writing its report.');
     fs.mkdirSync(output, { recursive: true });
-    for (const name of fs.readdirSync(documents))
-      if (/^(?:report\.json|(?:settings|credits|schedule)-.*\.png)$/.test(name))
+    // Preserve partial evidence even when the process times out or crashes.
+    for (const name of fs.existsSync(documents) ? fs.readdirSync(documents) : [])
+      if (/^(?:report\.json|progress\.log|(?:settings|credits|schedule)-.*\.png)$/.test(name))
         fs.copyFileSync(path.join(documents, name), path.join(output, name));
+    const progress = path.join(output, 'progress.log');
+    assert.ok(fs.existsSync(report), `UIKit harness timed out or crashed before writing its report.\n${fs.existsSync(progress) ? fs.readFileSync(progress, 'utf8') : 'No progress recorded.'}`);
     const result = JSON.parse(fs.readFileSync(report, 'utf8'));
     assert.equal(result.status, 'passed', JSON.stringify(result));
     assert.equal(result.viewports, 12);

@@ -181,6 +181,7 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
         nav.view.frame = (CGRect){CGPointZero, size.CGSizeValue};
         [nav.view layoutIfNeeded];
         for (NSInteger pageIndex = 0; pageIndex < 2; pageIndex++) {
+            HarnessProgress([NSString stringWithFormat:@"schedule page=%ld size=%@", (long)pageIndex, NSStringFromCGSize(size.CGSizeValue)]);
             [container selectPage:pageIndex];
             [container finishPageTransition];
             DOLowPowerScheduleController *page = container.selectedPage;
@@ -190,6 +191,7 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
             CheckScheduleBackdrops(page);
             CHECK(page.sectionGlassViews.count >= 2);
             for (NSInteger section = 0; section < page.tableView.numberOfSections; section++) {
+                HarnessProgress([NSString stringWithFormat:@"schedule footer=%ld", (long)section]);
                 DOCustomLiquidGlassView *glass = page.sectionGlassViews[@(section)];
                 CHECK(glass && !glass.hidden);
                 CGRect footer = [page.tableView rectForFooterInSection:section];
@@ -228,6 +230,7 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
             CheckScheduleBackdrops(page);
             NSDictionary *backdrops = [page.sectionGlassViews copy];
             for (NSUInteger pass = 0; pass < 12; pass++) {
+                HarnessProgress([NSString stringWithFormat:@"schedule expansion=%lu", (unsigned long)pass]);
                 [page setTimePickerExpanded:pass % 2 == 0 animated:NO];
                 [page.tableView setContentOffset:CGPointMake(0, pass % 2 ? 0 : 100) animated:NO];
                 CheckScheduleBackdrops(page);
@@ -236,6 +239,7 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
             if (pageIndex == 1) {
                 CHECK([page.tableView numberOfRowsInSection:2] == 60);
                 for (NSInteger row = 0; row < 60; row += 7) {
+                    HarnessProgress([NSString stringWithFormat:@"schedule history row=%ld", (long)row]);
                     [page.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:row inSection:2]
                         atScrollPosition:UITableViewScrollPositionMiddle animated:NO];
                     CheckScheduleBackdrops(page);
