@@ -3,6 +3,15 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {parseOpenStep}=require('./helpers/openstep.cjs');
 const {prepare,serialize}=require('../scripts/prepare-glass-app-project.cjs');
 const root=path.resolve(__dirname,'..');
+test('App-only workflow emits diagnostics and refuses an installer with stale runtime modules',()=>{
+ const workflow=fs.readFileSync(path.join(root,'.github/workflows/glass-app-build.yml'),'utf8');
+ assert.doesNotMatch(workflow,/build-glass-app\.py package|verification\/output\/\*/);
+ assert.match(workflow,/Compile current App only/);
+ const build=fs.readFileSync(path.join(root,'scripts/build-glass-app.py'),'utf8');
+ const cli=build.slice(build.indexOf("if __name__ == '__main__':"));
+ assert.match(cli,/parser\.error\('Scheduled power\/battery features require rebuilt roothidehooks and basebin/);
+ assert.doesNotMatch(cli,/package\(args\.work/);
+});
 test('disposable App project preserves tracked source, trims core targets, redirects only existing original binaries',()=>{
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'glass-app-project-'));
  try {

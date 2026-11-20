@@ -7,6 +7,8 @@
 
 #import "DOEnvironmentManager.h"
 #import "UIImage+JPEG2000.h"
+#import "../../../BaseBin/roothidehooks/src/RCLowPowerSchedule.h"
+#import "../../../BaseBin/roothidehooks/src/RCBatteryRecord.h"
 
 #import <sys/sysctl.h>
 #import <sys/mount.h>
@@ -28,6 +30,8 @@
 #import "DOPreferenceManager.h"
 #import "NSData+Hex.h"
 #import <LocalAuthentication/LocalAuthentication.h>
+#import <notify.h>
+#import <errno.h>
 
 int reboot3(uint64_t flags, ...);
 CFPropertyListRef MGCopyAnswer(CFStringRef);
@@ -939,6 +943,106 @@ extern char **environ;
         }];
         return nil;
     }
+}
+
+- (NSDictionary *)batteryRecordConfiguration
+{
+    __block NSDictionary *value;
+    [self runUnsandboxed:^{
+        value = rcLowPowerReadDictionary(rcBatteryPath(JBROOT_PATH(@"/"), @".plist"));
+    }];
+    return rcBatteryConfigurationValid(value) ? value : rcBatteryDefaultConfiguration();
+}
+
+- (NSDictionary *)batteryRecordStatus
+{
+    __block NSDictionary *value;
+    [self runUnsandboxed:^{ value = rcBatteryReadState(JBROOT_PATH(@"/")); }];
+    return value ?: @{};
+}
+
+- (BOOL)writeBatteryRecordValue:(NSDictionary *)value suffix:(NSString *)suffix error:(NSError **)error
+{
+    if (!self.isJailbroken) {
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:EPERM userInfo:nil];
+        return NO;
+    }
+    __block NSError *failure = nil;
+    __block BOOL success = NO;
+    [self runUnsandboxed:^{
+        success = rcLowPowerWriteDictionary(value, rcBatteryPath(JBROOT_PATH(@"/"), suffix), &failure);
+    }];
+    if (success) notify_post(RC_BATTERY_CHANGED);
+    else if (error) *error = failure;
+    return success;
+}
+
+- (BOOL)saveBatteryRecordConfiguration:(NSDictionary *)configuration error:(NSError **)error
+{
+    if (!rcBatteryConfigurationValid(configuration)) {
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:EINVAL userInfo:nil];
+        return NO;
+    }
+    return [self writeBatteryRecordValue:configuration suffix:@".plist" error:error];
+}
+
+- (NSString *)sendBatteryRecordCommand:(NSString *)action error:(NSError **)error
+{
+    if (![(@[@"start", @"stop"]) containsObject:action]) {
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:EINVAL userInfo:nil];
+        return nil;
+    }
+    NSString *identifier = NSUUID.UUID.UUIDString;
+    NSDictionary *command = @{ @"ID": identifier, @"Action": action, @"Date": NSDate.date };
+    return [self writeBatteryRecordValue:command suffix:@".command" error:error] ? identifier : nil;
+}
+
+- (NSDictionary *)lowPowerScheduleConfiguration
+{
+    __block NSDictionary *configuration;
+    [self runUnsandboxed:^{
+        configuration = rcLowPowerReadDictionary(rcLowPowerConfigurationPath(JBROOT_PATH(@"/")));
+    }];
+    return configuration ?: rcLowPowerDefaultConfiguration();
+}
+
+- (NSDictionary *)lowPowerScheduleStatus
+{
+    __block NSDictionary *status;
+    [self runUnsandboxed:^{
+        status = rcLowPowerReadDictionary(rcLowPowerStatusPath(JBROOT_PATH(@"/")));
+    }];
+    return status ?: @{};
+}
+
+- (BOOL)saveLowPowerScheduleEnabled:(BOOL)enabled startMinute:(NSInteger)startMinute
+                         endMinute:(NSInteger)endMinute error:(NSError **)error
+{
+    NSDictionary *configuration = @{
+        @"Version": @1,
+        @"Enabled": @(enabled),
+        @"StartMinute": @(startMinute),
+        @"EndMinute": @(endMinute),
+        @"Revision": NSUUID.UUID.UUIDString
+    };
+    if (!self.isJailbroken || !rcLowPowerConfigurationValid(configuration)) {
+        if (error) {
+            *error = [NSError errorWithDomain:NSPOSIXErrorDomain
+                                         code:self.isJailbroken ? EINVAL : EPERM
+                                     userInfo:nil];
+        }
+        return NO;
+    }
+    __block BOOL success = NO;
+    __block NSError *writeError = nil;
+    [self runUnsandboxed:^{
+        success = rcLowPowerWriteDictionary(configuration,
+                                             rcLowPowerConfigurationPath(JBROOT_PATH(@"/")),
+                                             &writeError);
+    }];
+    if (success) notify_post(RC_LOW_POWER_CHANGED);
+    else if (error) *error = writeError;
+    return success;
 }
 
 // 根据注入配置是否存在返回模式简称，供系统版本后的括号显示。

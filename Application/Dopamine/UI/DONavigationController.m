@@ -14,6 +14,9 @@
 #import "DOCustomGlassView.h"
 #import "DOCustomGlassMediaStore.h"
 #import "DOSettingsController.h"
+#import "Settings/DOLowPowerScheduleController.h"
+#import "Settings/DOPowerScheduleController.h"
+#import "Settings/DOBatteryRecordController.h"
 #import "DOCreditsViewController.h"
 #import "DOSupporterLicense.h"
 #import <QuartzCore/QuartzCore.h>
@@ -337,6 +340,9 @@ static CGFloat DOCustomGlassNavigationScrimAlpha(CGFloat luminance, CGFloat hier
 
 - (BOOL)isCustomGlassFullScreenViewController:(UIViewController *)viewController
 {
+    // Schedule pages own their back/save controls and unsaved-change confirmation.
+    if ([viewController isKindOfClass:DOLowPowerScheduleController.class] ||
+        [viewController isKindOfClass:DOPowerScheduleController.class]) return YES;
     return DOUsesCustomGlassTheme() &&
         ([viewController isKindOfClass:DOSettingsController.class] ||
          [viewController isKindOfClass:DOCreditsViewController.class] ||

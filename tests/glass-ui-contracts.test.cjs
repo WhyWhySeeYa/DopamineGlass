@@ -161,7 +161,7 @@ test('profile editing and focus mode are retained', () => {
   for (const selector of [
     'presentCustomGlassAvatarPicker', 'presentCustomGlassUsernameEditor',
     'presentCustomGlassMottoEditor', 'customGlassAvatarPanned',
-    'setCustomGlassProfileFocusEnabled',
+    'selectHomeAvatarVisibilityMode',
   ]) assert.ok(main.includes(selector), selector);
   assert.match(main, /DOCustomGlassMediaStoreSaveAvatar/);
   assert.match(material, /DOCustomGlassTheme\.ProfileFocusEnabled/);
@@ -195,20 +195,16 @@ test('username and motto editors use saved user input rather than treating place
   assert.match(main, /initWithTarget:self action:@selector\(presentCustomGlassMottoEditor\)/);
 });
 
-test('avatar focus retains root-edge docking, alpha-based hiding and restoration hooks', () => {
-  // These source hooks do not establish frame invariance. The health audit
-  // identifies a separate profile-height dependency that requires a layout fix.
-  const focus = section(main, '- (void)setCustomGlassProfileFocusEnabled:', '- (void)configureCustomGlassHeaderView:');
-  assert.match(focus, /for \(UIView \*label in self\.customGlassHeaderSubtitleLabels\)[\s\S]*?label\.alpha = detailAlpha/);
-  assert.match(focus, /self\.customGlassUsernameLabel\.alpha = detailAlpha/);
-  assert.match(focus, /self\.customGlassMottoLabel\.alpha = detailAlpha/);
-  assert.match(focus, /CGRect screenFrame = self\.view\.bounds/);
+test('avatar visibility modes persist atomically and gestures restore without shifting the main stack', () => {
+  const focus = section(main, '- (CGFloat)customGlassAvatarHiddenOffset', '- (void)configureCustomGlassHeaderView:');
+  assert.match(focus, /DOCustomGlassThemeSyncCommitChanges/);
+  assert.match(focus, /DOCustomGlassTheme.AvatarVisibility/);
+  assert.match(focus, /restoreHomeAvatarVisibilityPreference/);
+  assert.match(focus, /scheduleHomeAvatarAutoHide/);
   assert.match(focus, /translationInView:self\.view/);
   assert.match(focus, /fabs\(translation\.x\) >= 28\.0/);
-  assert.match(focus, /if \(self\.customGlassProfileFocusEnabled\)/);
-  assert.match(main, /avatarGlass\.centerXAnchor constraintEqualToAnchor:self\.view\.leadingAnchor/);
-  assert.match(main, /avatarGlass\.centerXAnchor constraintEqualToAnchor:self\.view\.trailingAnchor/);
-  assert.doesNotMatch(focus, /mainStack|setCustomSpacing|\.hidden\s*=/);
+  assert.match(focus, /accessibilityElementsHidden = hidden/);
+  assert.doesNotMatch(focus, /mainStack|setCustomSpacing/);
 });
 
 test('shared wallpaper handles images, video and Live Photo with persisted speed', () => {

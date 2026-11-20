@@ -1,4 +1,4 @@
-name: Glass App + verified official core (test candidate)
+name: Glass App compile diagnostics (full source build required for installer)
 on:
   workflow_dispatch:
 permissions:
@@ -37,6 +37,18 @@ jobs:
         run: |
           python3 scripts/build-glass-app.py prepare --work "$WORK"
           node scripts/prepare-glass-app-project.cjs "$WORK"
+      - name: Compile production schedule modules for both device architectures
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+          for arch in arm64 arm64e; do
+            for module in lowpowerschedule batteryrecord; do
+              xcrun --sdk iphoneos clang -fobjc-arc -fmodules -Werror \
+                -isysroot "$sdk" -target "$arch-apple-ios15.0" -I "$WORK/include" \
+                -c "BaseBin/roothidehooks/src/$module.m" -o "$WORK/$module-$arch.o"
+            done
+          done
       - name: Compile production UIKit layout and modal-return harness
         shell: bash
         run: |
@@ -55,17 +67,6 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
             2>&1 | tee verification/glass-app-xcodebuild.log
-      - name: Package and verify every original core file
-        run: |
-          python3 scripts/build-glass-app.py package --work "$WORK" \
-            --built "$WORK/derived/Build/Products/Release-iphoneos/Dopamine.app" \
-            --out verification/output
-      - name: Test-candidate installer (not a verified release)
-        uses: actions/upload-artifact@v4
-        with:
-          name: DopamineGlass-official-core-TEST-${{ github.run_number }}
-          path: verification/output/*
-          if-no-files-found: error
       - name: Build diagnostics
         if: always()
         uses: actions/upload-artifact@v4

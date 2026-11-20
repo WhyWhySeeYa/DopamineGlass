@@ -8,11 +8,23 @@ import plistlib
 from unittest import mock
 import unittest
 import zipfile
+import subprocess
+import sys
 spec = importlib.util.spec_from_file_location('glass_build', pathlib.Path(__file__).resolve().parents[1] / 'scripts/build-glass-app.py')
 build = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(build)
 
 class ArchiveIntegrityTests(unittest.TestCase):
+    def test_cli_refuses_installer_without_rebuilt_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = pathlib.Path(directory) / 'output'
+            result = subprocess.run([sys.executable, str(pathlib.Path(build.__file__)),
+                'package', '--work', directory, '--built', directory, '--out', str(output)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('require rebuilt roothidehooks and basebin', result.stderr)
+            self.assertFalse(output.exists())
+
     def archive(self, names):
         stream = io.BytesIO()
         with zipfile.ZipFile(stream, 'w') as z:

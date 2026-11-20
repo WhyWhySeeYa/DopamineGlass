@@ -31,3 +31,6 @@ Exploits/kfd/kfd.framework/kfd
 
 # Python build/test bytecode.
 __pycache__/
+
+!/docs/rc9-feature-migration.json
+!/docs/RC9-FEATURE-MIGRATION-2026-11-21.md

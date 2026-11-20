@@ -21,7 +21,20 @@ function harnessSource() {
   const credits = read(ui + 'Settings/DOCreditsViewController.m');
   const material = read(ui + 'DOCustomGlassView.m');
   const navigation = read(ui + 'DONavigationController.m');
+  const home = read(ui + 'DOMainViewController.m');
+  const lowPower = read(ui + 'Settings/DOLowPowerScheduleController.m');
+  const stripLocalImports = source => source.replace(/^#(?:import "[^"\n]+"|pragma once).*$/gm, '');
   const replacements = {
+    HOME_VIEWS: section(home, 'static NSString * const DOHomeThermalBreathKey', '@interface DOMainViewController'),
+    HOME_ENTRANCE_PROPERTIES: section(home, '@property(nonatomic, strong) UIView *homeEntranceHeader;', '@property(nonatomic) BOOL hideStatusBar;'),
+    HOME_ENTRANCE: section(home, '\n- (void)prepareHomeEntrance\n{', '// 显示主页时刷新信息及越狱按钮状态。'),
+    HOME_FOCUS: section(home, '- (CGFloat)customGlassAvatarHiddenOffset', '- (void)configureCustomGlassHeaderView:'),
+    HOME_THERMAL: section(home, '\n- (void)displayHomeThermalState:(NSProcessInfoThermalState)state animate:(BOOL)animate\n{', '\n- (void)startHomeThermalUpdates\n{'),
+    SCHEDULE_RUNTIME_HEADERS: stripLocalImports(read('BaseBin/roothidehooks/src/RCLowPowerSchedule.h')) + '\n' + stripLocalImports(read('BaseBin/roothidehooks/src/RCBatteryRecord.h')),
+    SCHEDULE_HEADERS: stripLocalImports(read(ui + 'Settings/DOLowPowerScheduleController.h')) + '\n' + stripLocalImports(read(ui + 'Settings/DOBatteryRecordController.h')) + '\n' + stripLocalImports(read(ui + 'Settings/DOPowerScheduleController.h')) + '\n' + read(ui + 'Settings/DOScheduleTimePicker.h'),
+    SCHEDULE_STRINGS: [...read('Application/Dopamine/zh-CN.lproj/Localizable.strings').matchAll(/^"([^"\n]+)"\s*=\s*("(?:\\.|[^"\\])*");/gm)]
+      .map(match => `@"${match[1]}": @${match[2]}`).join(',\n'),
+    SCHEDULE_CONTROLLERS: 'static NSString * const DOScheduleThemeDidChangeNotification = @"DOCustomGlassTheme.DidChange";\n' + lowPower.slice(lowPower.indexOf('@interface DOScheduleModeControl :')) + '\n' + stripLocalImports(read(ui + 'Settings/DOBatteryRecordController.m')),
     MODAL_RETURN: read(ui + 'Transition/DOModalBackAction.h') + '\n' +
       section(read(ui + 'Transition/DOModalBackAction.m'), '@implementation DOModalBackAction', '\n@end') + '\n@end',
     MODAL_RETURN_SETUP: section(navigation,
@@ -37,7 +50,9 @@ function harnessSource() {
     CREDITS_REFRESH: section(credits, '- (void)customGlassRefreshPageBackdrop', '- (void)customGlassRefreshPageAppearance'),
     CREDITS_LAYOUT: section(credits, '- (void)viewDidLayoutSubviews', '- (void)customGlassStyleContent:'),
   };
-  return read('tests/fixtures/preferences-ui-harness.m').replace(/\/\* PRODUCTION_(\w+) \*\//g, (_, key) => {
+  return read('tests/fixtures/preferences-ui-harness.m')
+    .replace('/* HOME_FOCUS_FIXTURE */', read('tests/fixtures/home-focus-harness.m'))
+    .replace('/* SCHEDULE_UI_FIXTURE */', read('tests/fixtures/schedule-ui-harness.m')).replace(/\/\* PRODUCTION_(\w+) \*\//g, (_, key) => {
     assert.ok(replacements[key], `Missing harness replacement ${key}`);
     return replacements[key];
   });
@@ -77,6 +92,15 @@ async function run() {
 <key>MinimumOSVersion</key><string>16.0</string>
 <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
 <key>UILaunchScreen</key><dict/>
+<key>UIApplicationSceneManifest</key><dict>
+    <key>UIApplicationSupportsMultipleScenes</key><false/>
+    <key>UISceneConfigurations</key><dict>
+      <key>UIWindowSceneSessionRoleApplication</key><array><dict>
+        <key>UISceneConfigurationName</key><string>Default Configuration</string>
+        <key>UISceneDelegateClassName</key><string>SceneDelegate</string>
+      </dict></array>
+    </dict>
+  </dict>
 </dict></plist>`);
     // Compile production snippets before asking the simulator service to start.
     // Even runtime startup failures then preserve native compilation evidence.
@@ -108,13 +132,15 @@ async function run() {
     assert.ok(fs.existsSync(report), 'UIKit harness timed out or crashed before writing its report.');
     fs.mkdirSync(output, { recursive: true });
     for (const name of fs.readdirSync(documents))
-      if (/^(?:report\.json|(?:settings|credits)-.*\.png)$/.test(name))
+      if (/^(?:report\.json|(?:settings|credits|schedule)-.*\.png)$/.test(name))
         fs.copyFileSync(path.join(documents, name), path.join(output, name));
     const result = JSON.parse(fs.readFileSync(report, 'utf8'));
     assert.equal(result.status, 'passed', JSON.stringify(result));
     assert.equal(result.viewports, 12);
     assert.equal(result.scrollChecks, 2400);
     assert.equal(result.authorizationBoundaryChecks, 13);
+    assert.equal(result.homeFocusCases, 6);
+    assert.equal(result.scheduleUICases, 6);
     console.log(`UIKit: ${runtime.version}; 12 page/viewport cases, 2400 offset checks; evidence: ${output}`);
   } finally {
     if (device) {

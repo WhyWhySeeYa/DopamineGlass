@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'docs/rc9-port-manifest.json'), 'utf8'));
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const git = (...args) => execFileSync('git', ['-c', 'safe.directory=' + root, '-C', root, ...args], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+const migration = JSON.parse(read('docs/rc9-feature-migration.json'));
 const original = file => git('show', manifest.upstream.commit + ':' + file);
 const normalize = text => text.replace(/\r\n/g, '\n').trim();
 const mainPath = 'Application/Dopamine/UI/DOMainViewController.m';
@@ -41,10 +42,27 @@ const checks = {
   },
   'jailbreak engine, exploit support, original resources and package managers remain upstream'() {
     const protectedPaths = manifest.contract.protectedPaths;
-    assert.equal(git('diff', '--name-only', manifest.upstream.commit, '--', ...protectedPaths).trim(), '',
-      'Changes outside the glass/authorization scope require separate review');
-    const others = git('ls-files', '--others', '--exclude-standard', '--', ...protectedPaths).trim();
-    assert.equal(others, '', 'Unexpected untracked additions inside protected upstream paths');
+    const integrations = ['Application/Dopamine/Jailbreak/DOEnvironmentManager.h',
+      'Application/Dopamine/Jailbreak/DOEnvironmentManager.m', 'BaseBin/roothidehooks/src/springboard.x'];
+    const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles)]);
+    for (const changed of [git('diff', '--name-only', manifest.upstream.commit, '--', ...protectedPaths),
+      git('ls-files', '--others', '--exclude-standard', '--', ...protectedPaths)])
+      for (const file of changed.trim().split('\n').filter(Boolean)) assert.ok(allowed.has(file), 'Protected upstream path: ' + file);
+    for (const [file, hash] of Object.entries(migration.runtimeFiles))
+      assert.equal(crypto.createHash('sha256').update(read(file).replace(/\r\n/g, '\n')).digest('hex'), hash, file);
+    let environment = read(integrations[1]).replace(/\r\n/g, '\n');
+    for (const signature of ['- (NSDictionary *)batteryRecordConfiguration', '- (NSDictionary *)batteryRecordStatus',
+      '- (BOOL)writeBatteryRecordValue:', '- (BOOL)saveBatteryRecordConfiguration:', '- (NSString *)sendBatteryRecordCommand:',
+      '- (NSDictionary *)lowPowerScheduleConfiguration', '- (NSDictionary *)lowPowerScheduleStatus', '- (BOOL)saveLowPowerScheduleEnabled:'])
+      environment = environment.replace(method(environment, signature) + '\n\n', '');
+    for (const line of ['#import "../../../BaseBin/roothidehooks/src/RCLowPowerSchedule.h"',
+      '#import "../../../BaseBin/roothidehooks/src/RCBatteryRecord.h"', '#import <notify.h>', '#import <errno.h>'])
+      environment = environment.replace(line + '\n', '');
+    assert.equal(normalize(environment), normalize(original(integrations[1])), 'Existing environment manager stays exact');
+    const header = read(integrations[0]).replace(/\r\n/g, '\n').replace(/^- \(NSDictionary \*\)batteryRecordConfiguration;[\s\S]*?endMinute:\(NSInteger\)endMinute error:\(NSError \*\*\)error;\n/m, '');
+    assert.equal(normalize(header), normalize(original(integrations[0])), 'Existing environment header stays exact');
+    const springboard = read(integrations[2]).replace(/\r\n/g, '\n').replace(/^\textern void rc(?:LowPowerSchedule|BatteryRecord)Start\(void\);\n|^\trc(?:LowPowerSchedule|BatteryRecord)Start\(\);\n/gm, '');
+    assert.equal(normalize(springboard), normalize(original(integrations[2])), 'Only two sbInit startups may be added');
   },
   'upstream jailbreak execution and title remain exact and cannot depend on theme authorization'() {
     const home = read(mainPath);
@@ -118,10 +136,14 @@ const checks = {
     const end = specifiers.indexOf('        PSSpecifier *themingGroupSpecifier', start);
     assert.ok(start >= 0 && end > start, 'Supporter entry must be independent of the support matrix');
     specifiers = specifiers.slice(0, start) + specifiers.slice(end);
+    const scheduleStart = specifiers.indexOf('                    PSSpecifier *lowPowerSchedule =');
+    const scheduleEnd = specifiers.indexOf('                    for (NSDictionary *tool', scheduleStart);
+    assert.ok(scheduleStart >= 0 && scheduleEnd > scheduleStart);
+    specifiers = specifiers.slice(0, scheduleStart) + specifiers.slice(scheduleEnd);
     assert.equal(normalize(specifiers), normalize(method(base, '- (id)specifiers')));
     assert.match(current, /setAlternateIconName:icon/);
     assert.match(current, /updateBootLogo/);
-    assert.doesNotMatch(current, /DOLowPowerScheduleController|customMountBusy|mountCustomDirectoryPressed/);
+    assert.doesNotMatch(current, /customMountBusy|mountCustomDirectoryPressed/);
   },
   'original theme definitions and alternate app icons coexist with additive Custom Glass'() {
     const file = 'Application/Dopamine/UI/Themes/Themes.plist';
@@ -145,6 +167,7 @@ const checks = {
       if (key !== 'objects') assert.deepEqual(current[key], value, key);
     }
     const appendOnly = new Map([
+      ['042479692B66916B0082581B', 'children'],
       ['042479672B66916B0082581B', 'children'], ['8C029F642B4E2E7D0071DE58', 'children'],
       ['8C7198112ABF0E82003C6658', 'files'], ['8C7198122ABF0E82003C6658', 'files'],
     ]);
@@ -169,7 +192,10 @@ const checks = {
     const frameworkPaths = frameworks.files.map(id => current.objects[current.objects[id].fileRef]?.path || '');
     for (const name of ['AVFoundation', 'Photos', 'PhotosUI', 'CoreImage', 'QuartzCore', 'Security'])
       assert.ok(frameworkPaths.some(file => file.endsWith('/' + name + '.framework')), name);
-    assert.doesNotMatch(read(projectPath), /DOLowPowerScheduleController/);
+    for (const name of ['DOLowPowerScheduleController.m', 'DOBatteryRecordController.m']) {
+      assert.equal(sourcePaths.filter(file => file === name).length, 1, name);
+      assert.ok(fs.existsSync(path.join(root, 'Application/Dopamine/UI/Settings', name)));
+    }
   },
   'RC9 imports and reviewed glass authorization adaptations match their recorded hashes'() {
     for (const [file, hash] of Object.entries(manifest.rc9.unchangedRuntimeFiles))

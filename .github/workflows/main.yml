@@ -151,7 +151,6 @@ jobs:
         run: node scripts/run-rc9-tests.cjs
 
   uikit-layout:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15-intel
     timeout-minutes: 20
     steps:

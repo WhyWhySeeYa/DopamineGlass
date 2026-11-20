@@ -23,6 +23,7 @@
 #import "DOCustomGlassView.h"
 #import "../DOThemePresentation.h"
 #import "../DOSupporterLicenseUI.h"
+#import "DOPowerScheduleController.h"
 
 @interface DOSettingsController ()
 
@@ -576,6 +577,14 @@
                 [specifiers addObject:actionsGroupSpecifier];
 
                 if (envManager.isJailbroken) {
+                    PSSpecifier *lowPowerSchedule = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:nil get:nil detail:nil cell:PSStaticTextCell edit:nil];
+                    [lowPowerSchedule setProperty:@"PowerSchedule_Title" forKey:@"title"];
+                    [lowPowerSchedule setProperty:[DOButtonCell class] forKey:@"cellClass"];
+                    [lowPowerSchedule setProperty:buttonHeight forKey:@"height"];
+                    [lowPowerSchedule setProperty:@"calendar.badge.clock" forKey:@"image"];
+                    [lowPowerSchedule setProperty:@"lowPowerSchedulePressed" forKey:@"action"];
+                    [specifiers addObject:lowPowerSchedule];
+
                     for (NSDictionary *tool in @[
                         @{@"title": @"Install Whitelist App", @"action": @"installWhitelistAppPressed"},
                         @{@"title": @"Install Mount App", @"action": @"installMountAppPressed"}
@@ -1021,6 +1030,11 @@
 - (void)refreshJailbreakAppsPressed
 {
     [[DOEnvironmentManager sharedManager] refreshJailbreakApps];
+}
+
+- (void)lowPowerSchedulePressed
+{
+    [self.navigationController pushViewController:[DOPowerScheduleController new] animated:YES];
 }
 
 - (void)supporterLicensePressed

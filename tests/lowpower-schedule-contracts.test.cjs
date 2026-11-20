@@ -1,0 +1,162 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+
+const root = path.resolve(__dirname, '..');
+const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
+const runtime = read('BaseBin/roothidehooks/src/lowpowerschedule.m');
+const header = read('BaseBin/roothidehooks/src/RCLowPowerSchedule.h');
+const controller = read('Application/Dopamine/UI/Settings/DOLowPowerScheduleController.m');
+const environment = read('Application/Dopamine/Jailbreak/DOEnvironmentManager.m');
+const settings = read('Application/Dopamine/UI/Settings/DOSettingsController.m');
+
+test('production calendar resolves overnight, midnight, DST collisions and atomic storage', {
+  skip: process.platform !== 'darwin' ? 'Requires macOS Foundation; runs the production calendar/storage header.' : false,
+}, () => {
+  const os = require('node:os');
+  const { execFileSync } = require('node:child_process');
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'rh-lowpower-calendar-'));
+  try {
+    const binary = path.join(temp, 'test');
+    execFileSync('xcrun', ['clang', '-fobjc-arc', '-fblocks', '-framework', 'Foundation',
+      '-I', path.join(root, 'BaseBin/roothidehooks/src'),
+      path.join(root, 'tests/fixtures/lowpower-calendar-harness.m'), '-o', binary], { stdio: 'pipe' });
+    execFileSync(binary, [temp], { stdio: 'pipe' });
+  } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+function body(source, signature) {
+  const start = source.indexOf(signature);
+  assert.ok(start >= 0, `Missing source block: ${signature}`);
+  const opening = source.indexOf('{', start + signature.length);
+  let depth = 0;
+  for (let index = opening; index < source.length; index++) {
+    if (source[index] === '{') depth++;
+    if (source[index] === '}' && --depth === 0) return source.slice(opening + 1, index);
+  }
+  assert.fail(`Unclosed source block: ${signature}`);
+}
+
+test('SpringBoard owns the event-driven scheduler, not the app lifecycle', () => {
+  assert.match(read('BaseBin/roothidehooks/src/springboard.x'), /rcLowPowerScheduleStart\(\)/);
+  assert.match(runtime, /jbclient_get_jbroot\(\)/);
+  assert.match(runtime, /NSClassFromString\(@"PCPersistentTimer"\)/);
+  assert.match(runtime, /setDisableSystemWaking:NO/);
+  assert.match(runtime, /setMinimumEarlyFireProportion:0\.0/);
+  assert.match(runtime, /setEarlyFireConstantInterval:0\.0/);
+  assert.doesNotMatch(runtime, /NSTimer|sleep\(|dispatch_source_create/);
+});
+
+test('configuration validation and local calendar handle daily and DST boundaries', () => {
+  assert.match(header, /CFBooleanGetTypeID\(\)/);
+  assert.match(header, /initWithUUIDString:/);
+  assert.match(header, /StartMinute.*EndMinute/s);
+  assert.match(header, /NSCalendarMatchNextTime \| NSCalendarMatchFirst/);
+  assert.match(header, /dateByAddingUnit:NSCalendarUnitDay/);
+  assert.match(header, /NSTimeZone\.localTimeZone/);
+  assert.doesNotMatch(header, /86400/);
+});
+
+test('storage is bounded and atomic and writes are restricted to the unsandboxed RootHide path', () => {
+  assert.match(header, /> 16384/);
+  assert.match(header, /NSDataWritingAtomic/);
+  assert.match(header, /NSDataWritingFileProtectionNone/);
+  assert.match(header, /NSFilePosixPermissions: @0600/);
+  const write = body(header, 'static inline BOOL rcLowPowerWriteDictionary(');
+  assert.ok(write.indexOf('setAttributes:') < write.indexOf('rename('));
+  assert.match(write, /if \(!success\) \[manager removeItemAtPath:temporary/);
+  const save = body(environment, '- (BOOL)saveLowPowerScheduleEnabled:');
+  assert.match(save, /!self\.isJailbroken/);
+  assert.match(save, /rcLowPowerConfigurationValid\(configuration\)/);
+  assert.match(save, /runUnsandboxed/);
+  assert.match(save, /notify_post\(RC_LOW_POWER_CHANGED\)/);
+  assert.doesNotMatch(save, /runAsRoot/);
+});
+
+test('scheduler checks private ABI, arms the next event before applying mode, and bounds retries', () => {
+  const refresh = body(runtime, '- (void)refresh\n');
+  assert.match(refresh, /rcLowPowerAPIsAvailable\(\)/);
+  assert.match(refresh, /@try/);
+  assert.match(refresh, /@catch/);
+  assert.ok(refresh.indexOf('[self armForDate:next[@"Date"]]') <
+    refresh.indexOf('setPowerMode:'));
+  assert.match(refresh, /if \(!\[configuration\[@"Enabled"\] boolValue\]\)/);
+  assert.match(refresh, /self\.retryCount < 4/);
+  assert.match(refresh, /self\.retryAfter/);
+  assert.match(refresh, /saved\[@"LastHandled"\]/);
+});
+
+test('settings exposes the schedule while jailbroken and UI never applies system mode directly', () => {
+  assert.match(settings, /DOPowerScheduleController\.h/);
+  assert.match(settings, /PowerSchedule_Title/);
+  assert.match(settings, /lowPowerSchedulePressed/);
+  assert.match(settings, /pushViewController:\[DOPowerScheduleController new\]/);
+  assert.match(controller, /DOScheduleTimePicker\(minute, self/);
+  assert.match(read('Application/Dopamine/UI/Settings/DOScheduleTimePicker.h'), /UIDatePickerModeTime/);
+  assert.match(controller, /start == end/);
+  assert.doesNotMatch(controller, /RC_LOW_POWER_QUERY|notify_post|UIActivityIndicatorView|scheduledTimer|dispatch_after/);
+  assert.match(controller, /runtimeStatus\[@"Revision"\] isEqual:self\.savedConfiguration\[@"Revision"\]/);
+  assert.match(controller, /notify_cancel\(self\.statusToken\)/);
+  assert.doesNotMatch(controller, /setPowerMode:/);
+  const refresh = body(runtime, '- (void)refresh\n');
+  const disabled = refresh.match(
+    /if \(!\[configuration\[@"Enabled"\] boolValue\]\) \{([\s\S]*?)\n    \}/,
+  )[1];
+  assert.match(disabled, /publishStatus:@"disabled"/);
+  assert.doesNotMatch(disabled, /setPowerMode/);
+});
+
+test('low-power schedule uses the same full-screen navigation frame as settings', () => {
+  const navigation = read('Application/Dopamine/UI/DONavigationController.m');
+  const fullScreen = body(navigation, '- (BOOL)isCustomGlassFullScreenViewController:');
+  assert.match(fullScreen, /DOSettingsController\.class/);
+  assert.match(fullScreen, /DOLowPowerScheduleController\.class/);
+  assert.match(controller, /tableView\.bounces = YES/);
+  assert.match(controller, /tableView\.alwaysBounceVertical = YES/);
+  assert.doesNotMatch(controller, /revealScheduleStatusIfNeeded/);
+});
+
+test('schedule footers use one custom label and cannot receive UIKit default footer text', () => {
+  const battery = read('Application/Dopamine/UI/Settings/DOBatteryRecordController.m');
+  assert.doesNotMatch(controller + battery, /titleForFooterInSection:/);
+  const footer = body(controller, '- (UIView *)tableView:(UITableView *)tableView viewForFooterInSection:');
+  assert.doesNotMatch(footer, /UITableViewHeaderFooterView/);
+  assert.equal((footer.match(/\[UILabel new\]/g) || []).length, 1);
+  assert.match(footer, /footerTextForSection:section/);
+});
+
+test('scheduled recording has no manual start or refresh UI and keeps an exit for active records', () => {
+  const battery = read('Application/Dopamine/UI/Settings/DOBatteryRecordController.m');
+  assert.doesNotMatch(controller + battery, /PowerSchedule_TapRefresh|PowerSchedule_Refreshing|BatteryRecord_Start"|requestStatus|statusWaiting|queryDate/);
+  assert.match(battery, /sendBatteryRecordCommand:@"stop"/);
+  assert.doesNotMatch(battery, /sendBatteryRecordCommand:@"start"/);
+  const cell = body(controller, '- (void)configureStatusCell:');
+  assert.match(cell, /UIAccessibilityTraitStaticText/);
+  assert.match(cell, /UITableViewCellSelectionStyleNone/);
+});
+
+test('page entry prelays out the destination and uses the reported animation duration', () => {
+  const transition = read('Application/Dopamine/UI/Transition/DOModalTransitionPush.m');
+  assert.ok(transition.indexOf('[toViewController.view layoutIfNeeded]') < transition.indexOf('[UIView animateWithDuration:'));
+  assert.match(transition, /animateWithDuration:\[self transitionDuration:transitionContext\]/);
+});
+
+test('all schedule localization keys exist in the supported release locales', () => {
+  const keys = new Set([...controller.matchAll(/@"(LowPowerSchedule_\w+)"/g)].map(match => match[1]));
+  keys.add('LowPowerSchedule_Title');
+  for (const locale of ['en', 'zh-CN', 'zh-Hans']) {
+    const strings = read(`Application/Dopamine/${locale}.lproj/Localizable.strings`);
+    for (const key of keys) {
+      assert.equal([...strings.matchAll(new RegExp(`^"${key}"\\s*=`, 'gm'))].length, 1,
+        `${locale} must define ${key} exactly once`);
+    }
+  }
+});
+
+
+test('controller is included in the Xcode app target and SpringBoard hook source glob', () => {
+  const project = read('Application/Dopamine.xcodeproj/project.pbxproj');
+  assert.equal(project.match(/DOLowPowerScheduleController\.m in Sources/g)?.length, 2);
+  assert.match(read('BaseBin/roothidehooks/Makefile'), /wildcard src\/\*\.m/);
+});

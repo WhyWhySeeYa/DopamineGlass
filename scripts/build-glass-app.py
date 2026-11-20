@@ -238,4 +238,4 @@ if __name__ == '__main__':
     else:
         if not args.built or not args.out:
             parser.error('package requires --built and --out')
-        package(args.work, args.built, args.out)
+        parser.error('Scheduled power/battery features require rebuilt roothidehooks and basebin. Use the full-source workflow; pinned-core packaging is disabled.')

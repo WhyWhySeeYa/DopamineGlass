@@ -543,7 +543,9 @@ test('authorization limits the glass theme while standalone jailbreak and mainte
   }
 
   const focusGesture = objcMethod(home, '- (void)customGlassAvatarPanned:');
-  assert.doesNotMatch(focusGesture, /requireCustomGlassSupporterAuthorization|DORHSupporter/);
+  assert.match(focusGesture, /requireCustomGlassSupporterAuthorization/);
+  assert.match(focusGesture, /DOCustomGlassThemeSyncCommitChanges/);
+  assert.ok(focusGesture.indexOf("requireCustomGlassSupporterAuthorization") < focusGesture.indexOf("DOCustomGlassThemeSyncCommitChanges"));
 
   const jailbreak = objcMethod(home, '- (void)startJailbreak');
   assert.doesNotMatch(jailbreak, /requireCustomGlassSupporterAuthorization|DORHSupporter/);

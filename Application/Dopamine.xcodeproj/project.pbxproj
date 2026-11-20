@@ -11,6 +11,8 @@
 		040622AA2B77FE8E00393AAD /* DOPkgManagerPickerViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 040622A92B77FE8E00393AAD /* DOPkgManagerPickerViewController.m */; };
 		042479A22B66916B0082581B /* DOCreditsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0424796B2B66916B0082581B /* DOCreditsViewController.m */; };
 		042479A32B66916B0082581B /* DOSettingsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0424796C2B66916B0082581B /* DOSettingsController.m */; };
+		9C9000012026110800000001 /* DOLowPowerScheduleController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C9000012026110800000002 /* DOLowPowerScheduleController.m */; };
+		BC2026112000000000000001 /* DOBatteryRecordController.m in Sources */ = {isa = PBXBuildFile; fileRef = BC2026112000000000000002 /* DOBatteryRecordController.m */; };
 		042479A42B66916B0082581B /* Credits.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0424796F2B66916B0082581B /* Credits.plist */; };
 		042479A52B66916B0082581B /* DOCreditsCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 042479732B66916B0082581B /* DOCreditsCell.m */; };
 		042479A62B66916B0082581B /* DOHeaderCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 042479752B66916B0082581B /* DOHeaderCell.m */; };
@@ -397,6 +399,11 @@
 		0424796E2B66916B0082581B /* DOCreditsViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DOCreditsViewController.h; sourceTree = "<group>"; };
 		0424796F2B66916B0082581B /* Credits.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Credits.plist; sourceTree = "<group>"; };
 		042479702B66916B0082581B /* DOSettingsController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DOSettingsController.h; sourceTree = "<group>"; };
+		9C9000012026110800000002 /* DOLowPowerScheduleController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOLowPowerScheduleController.m; sourceTree = "<group>"; };
+		9C9000012026110800000003 /* DOLowPowerScheduleController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOLowPowerScheduleController.h; sourceTree = "<group>"; };
+		BC2026112200000000000001 /* DOPowerScheduleController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOPowerScheduleController.h; sourceTree = "<group>"; };
+		BC2026112000000000000002 /* DOBatteryRecordController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOBatteryRecordController.m; sourceTree = "<group>"; };
+		BC2026112000000000000003 /* DOBatteryRecordController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOBatteryRecordController.h; sourceTree = "<group>"; };
 		042479722B66916B0082581B /* DOHeaderCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DOHeaderCell.h; sourceTree = "<group>"; };
 		042479732B66916B0082581B /* DOCreditsCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DOCreditsCell.m; sourceTree = "<group>"; };
 		042479742B66916B0082581B /* DOButtonCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DOButtonCell.h; sourceTree = "<group>"; };
@@ -699,6 +706,7 @@
 		8CF3E85B2F72D50200931CA8 /* DarkSword.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DarkSword.m; sourceTree = "<group>"; };
 		8CF3E85E2F72D51200931CA8 /* DarkSword.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DarkSword.h; sourceTree = "<group>"; };
 		C075B0CB2B8F2BCE009A26BB /* th */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = th; path = th.lproj/Localizable.strings; sourceTree = "<group>"; };
+		BC2026112100000000000001 /* DOScheduleTimePicker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOScheduleTimePicker.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -908,6 +916,12 @@
 				0424796C2B66916B0082581B /* DOSettingsController.m */,
 				04DD0B332B7BA38C0055DE4F /* DOLicenseViewController.h */,
 				04DD0B342B7BA38C0055DE4F /* DOLicenseViewController.m */,
+				9C9000012026110800000002 /* DOLowPowerScheduleController.m */,
+				9C9000012026110800000003 /* DOLowPowerScheduleController.h */,
+				BC2026112200000000000001 /* DOPowerScheduleController.h */,
+				BC2026112000000000000002 /* DOBatteryRecordController.m */,
+				BC2026112000000000000003 /* DOBatteryRecordController.h */,
+				BC2026112100000000000001 /* DOScheduleTimePicker.h */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -1946,6 +1960,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2352,6 +2367,8 @@
 				042479B62B66916B0082581B /* DOActionMenuButton.m in Sources */,
 				8C71981D2ABF0E82003C6658 /* DOSceneDelegate.m in Sources */,
 				042479A32B66916B0082581B /* DOSettingsController.m in Sources */,
+				9C9000012026110800000001 /* DOLowPowerScheduleController.m in Sources */,
+				BC2026112000000000000001 /* DOBatteryRecordController.m in Sources */,
 
 				A91611040000000000000001 /* DOCustomGlassView.m in Sources */,
 			);
