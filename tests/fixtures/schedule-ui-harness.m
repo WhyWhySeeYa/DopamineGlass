@@ -188,6 +188,11 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
             [page.view layoutIfNeeded];
             [page.tableView reloadData];
             [page.tableView layoutIfNeeded];
+            // Batch updates retire their old header/footer views on the next
+            // run-loop turn, even when row animations are disabled. Let that
+            // cleanup finish after the preceding rapid expansion stress case.
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            [page.tableView layoutIfNeeded];
             CheckScheduleBackdrops(page);
             CHECK(page.sectionGlassViews.count >= 2);
             for (NSInteger section = 0; section < page.tableView.numberOfSections; section++) {
@@ -212,11 +217,13 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
                 }
                 CheckScheduleBackdrops(page);
                 footer = [page.tableView rectForFooterInSection:section];
+                NSMutableArray *labelFrames = [NSMutableArray new];
+                for (UILabel *mounted in labels) [labelFrames addObject:NSStringFromCGRect([mounted convertRect:mounted.bounds toView:page.tableView])];
                 if (labels.count != 1) @throw [NSException exceptionWithName:@"LayoutFailure"
-                    reason:[NSString stringWithFormat:@"schedule footer: page=%ld section=%ld labels=%lu viewport=%@ footer=%@ bounds=%@ content=%@ hidden=%d alpha=%.2f",
+                    reason:[NSString stringWithFormat:@"schedule footer: page=%ld section=%ld labels=%lu viewport=%@ footer=%@ bounds=%@ content=%@ hidden=%d alpha=%.2f labelFrames=%@",
                         (long)pageIndex, (long)section, (unsigned long)labels.count, NSStringFromCGSize(size.CGSizeValue),
                         NSStringFromCGRect(footer), NSStringFromCGRect(page.tableView.bounds), NSStringFromCGSize(page.tableView.contentSize),
-                        page.tableView.hidden, page.tableView.alpha] userInfo:nil];
+                        page.tableView.hidden, page.tableView.alpha, labelFrames] userInfo:nil];
                 UILabel *label = labels.firstObject;
                 CGRect textFrame = [label convertRect:label.bounds toView:page.tableView];
                 CHECK(CGRectGetMinY(textFrame) >= CGRectGetMinY(footer) + 15);
