@@ -114,6 +114,8 @@ test('low-power schedule uses the same full-screen navigation frame as settings'
   assert.match(fullScreen, /DOLowPowerScheduleController\.class/);
   assert.match(controller, /tableView\.bounces = YES/);
   assert.match(controller, /tableView\.alwaysBounceVertical = YES/);
+  assert.match(controller, /estimatedSectionHeaderHeight = 0/);
+  assert.match(controller, /estimatedSectionFooterHeight = 0/);
   assert.doesNotMatch(controller, /revealScheduleStatusIfNeeded/);
 });
 

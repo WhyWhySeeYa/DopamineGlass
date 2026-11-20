@@ -424,6 +424,10 @@ static NSString * const DOScheduleThemeDidChangeNotification = @"DOCustomGlassTh
     self.tableView.delegate = self;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 60;
+    // Only two/three sections: resolve supplementary heights up front so
+    // querying a header cannot shift the row coordinates under its glass.
+    self.tableView.estimatedSectionHeaderHeight = 0;
+    self.tableView.estimatedSectionFooterHeight = 0;
     [self refreshScheduleScrollInsets];
     [self.view addSubview:self.tableView];
 
