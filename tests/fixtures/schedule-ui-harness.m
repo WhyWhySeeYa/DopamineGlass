@@ -70,7 +70,12 @@ static void CheckScheduleBackdrops(DOLowPowerScheduleController *page)
         CHECK(fabs(CGRectGetWidth(actual) - CGRectGetWidth(expected)) < 0.5);
         CGRect header = [page.tableView rectForHeaderInSection:section];
         CGRect footer = [page.tableView rectForFooterInSection:section];
-        CHECK(CGRectGetMinY(actual) >= CGRectGetMaxY(header) - 0.5);
+        if (CGRectGetMinY(actual) < CGRectGetMaxY(header) - 0.5)
+            @throw [NSException exceptionWithName:@"LayoutFailure"
+                reason:[NSString stringWithFormat:@"schedule header overlap: page=%@ section=%ld actual=%@ first=%@ last=%@ header=%@ footer=%@ bounds=%@ expanded=%d",
+                    NSStringFromClass(page.class), (long)section, NSStringFromCGRect(actual), NSStringFromCGRect(first),
+                    NSStringFromCGRect(last), NSStringFromCGRect(header), NSStringFromCGRect(footer),
+                    NSStringFromCGRect(page.tableView.bounds), page.timePickerExpanded] userInfo:nil];
         CHECK(CGRectGetMaxY(actual) <= CGRectGetMinY(footer) + 0.5);
     }
     for (UITableViewCell *cell in page.tableView.visibleCells) {
