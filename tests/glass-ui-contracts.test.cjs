@@ -442,7 +442,7 @@ void otherRelease(NSString *filename);
 static NSData *UIImageJPEGRepresentation(UIImage *image, double quality) { return image.data; }
 ${read('tests/helpers/glass-theme-access.m')}
 ${theme}
-${section(main, 'static NSString *DOCustomGlassLimitedText', '@interface DOMainViewController')}
+${section(main, 'static NSString *DOCustomGlassLimitedText', 'static NSString * const DOHomeThermalBreathKey')}
 ${section(media, 'static inline NSURL *DOCustomGlassMediaStoreSandboxContainerURL', 'static inline NSURL *DOCustomGlassMediaStoreContainerURL')}
 ${store}
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "check failed at line %d\\n", __LINE__); return 1; } } while (0)

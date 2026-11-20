@@ -158,7 +158,7 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
     DOScheduleModeControl *mode = container.modeControl;
     for (NSUInteger i = 0; i < 8; i++) [container selectPage:i % 2];
     [container finishPageTransition];
-    CHECK(container.modeControl == mode && container.children.count == 2);
+    CHECK(container.modeControl == mode && container.childViewControllers.count == 2);
     CHECK(container.contentView.userInteractionEnabled);
     CHECK(container.selectedPage.view.maskView == nil && container.pageAnimator == nil);
     CHECK(low.view.hidden != battery.view.hidden);

@@ -8,7 +8,7 @@ static BOOL DOCustomGlassThemeSyncCommitChanges(NSDictionary *changes) {
     for (NSString *key in changes) [NSUserDefaults.standardUserDefaults setObject:changes[key] forKey:key];
     return YES;
 }
-static void DOCustomGlassPresentMediaImportError(UIViewController *controller, NSString *key) { TestThemeSaveErrors++; }
+void DOCustomGlassPresentMediaImportError(UIViewController *controller, NSString *key) { TestThemeSaveErrors++; }
 /* PRODUCTION_HOME_VIEWS */
 
 @interface HomeTestPan : UIPanGestureRecognizer

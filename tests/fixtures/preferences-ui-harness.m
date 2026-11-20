@@ -12,7 +12,7 @@ static BOOL DOIsCustomGlassThemeSelected(void) { return TestGlassSelected; }
 static BOOL DOUsesCustomGlassTheme(void) { return TestAuthorization && TestGlassSelected; }
 /* PRODUCTION_MATERIAL */
 
-#define CHECK(condition) do { if (!(condition)) @throw [NSException exceptionWithName:@"LayoutFailure" reason:@#condition userInfo:nil]; } while (0)
+#define CHECK(...) do { if (!(__VA_ARGS__)) @throw [NSException exceptionWithName:@"LayoutFailure" reason:@#__VA_ARGS__ userInfo:nil]; } while (0)
 
 /* PRODUCTION_MODAL_RETURN */
 @interface ModalReturnHarness : UIViewController
@@ -246,7 +246,7 @@ static void Layout(DOPSListController *page)
     [page viewDidLayoutSubviews];
 }
 
-static void Snapshot(DOPSListController *page, NSString *name, NSString *documents)
+static void Snapshot(UIViewController *page, NSString *name, NSString *documents)
 {
     [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
     UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:page.view.bounds.size];
