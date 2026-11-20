@@ -264,6 +264,7 @@ static NSUInteger CheckHomeFocus(UIViewController *host)
                     // Wait for the production completion callback, not a narrow
                     // wall-clock estimate on a busy software-rendered simulator.
                     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:10];
+                    [CATransaction flush];
                     while (home.homeEntranceAnimator && deadline.timeIntervalSinceNow > 0)
                         [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
                 } else {
@@ -271,7 +272,11 @@ static NSUInteger CheckHomeFocus(UIViewController *host)
                     entrance.fractionComplete = 0.45;
                     [home finishHomeEntrance];
                 }
-                CHECK(!home.homeEntrancePrepared && home.homeEntranceAnimator == nil);
+                if (home.homeEntrancePrepared || home.homeEntranceAnimator)
+                    @throw [NSException exceptionWithName:@"LayoutFailure"
+                        reason:[NSString stringWithFormat:@"entrance unfinished: viewport=%lu state=%ld running=%d fraction=%.3f scene=%ld",
+                            (unsigned long)cases, (long)entrance.state, entrance.running, entrance.fractionComplete,
+                            (long)home.view.window.windowScene.activationState] userInfo:nil];
                 for (UIView *view in entranceViews) {
                     CHECK(view.alpha == 1);
                     CHECK(CGAffineTransformIsIdentity(view.transform));

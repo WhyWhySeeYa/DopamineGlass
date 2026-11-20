@@ -398,7 +398,10 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
 {
     if (self.checksStarted) return;
     self.checksStarted = YES;
-    dispatch_async(dispatch_get_main_queue(), ^{
+    // The harness pumps the run loop while waiting for animation completion.
+    // Run from a timer so that a nested loop can service main-queue callbacks;
+    // doing the whole test inside a main-queue block prevents reentrant drain.
+    [NSTimer scheduledTimerWithTimeInterval:0.01 repeats:NO block:^(NSTimer *timer) {
         UIViewController *host = self.window.rootViewController;
         NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
         NSDictionary *report;
@@ -406,7 +409,7 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
         @catch (NSException *exception) { report = @{@"status": @"failed", @"reason": exception.description}; }
         NSData *data = [NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:nil];
         [data writeToFile:[documents stringByAppendingPathComponent:@"report.json"] atomically:YES];
-    });
+    }];
 }
 @end
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
