@@ -192,13 +192,24 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
                 CHECK([page tableView:page.tableView heightForFooterInSection:section] >= 36);
                 CHECK(![page respondsToSelector:@selector(tableView:titleForFooterInSection:)]);
                 // Inspect actual mounted labels; geometry alone missed the duplicate footer.
-                [page.tableView scrollRectToVisible:footer animated:NO];
-                [page.tableView layoutIfNeeded];
+                NSMutableArray<UILabel *> *labels = [NSMutableArray new];
+                // Estimated self-sizing rows can move a footer after the first
+                // scroll. Locate the final rect before asserting mounted labels.
+                for (NSUInteger attempt = 0; attempt < 8; attempt++) {
+                    footer = [page.tableView rectForFooterInSection:section];
+                    [page.tableView scrollRectToVisible:footer animated:NO];
+                    [page.tableView layoutIfNeeded];
+                    [labels removeAllObjects];
+                    ScheduleLabels(page.tableView, [page footerTextForSection:section], labels);
+                    if (labels.count) break;
+                }
                 CheckScheduleBackdrops(page);
                 footer = [page.tableView rectForFooterInSection:section];
-                NSMutableArray<UILabel *> *labels = [NSMutableArray new];
-                ScheduleLabels(page.tableView, [page footerTextForSection:section], labels);
-                CHECK(labels.count == 1);
+                if (labels.count != 1) @throw [NSException exceptionWithName:@"LayoutFailure"
+                    reason:[NSString stringWithFormat:@"schedule footer: page=%ld section=%ld labels=%lu viewport=%@ footer=%@ bounds=%@ content=%@ hidden=%d alpha=%.2f",
+                        (long)pageIndex, (long)section, (unsigned long)labels.count, NSStringFromCGSize(size.CGSizeValue),
+                        NSStringFromCGRect(footer), NSStringFromCGRect(page.tableView.bounds), NSStringFromCGSize(page.tableView.contentSize),
+                        page.tableView.hidden, page.tableView.alpha] userInfo:nil];
                 UILabel *label = labels.firstObject;
                 CGRect textFrame = [label convertRect:label.bounds toView:page.tableView];
                 CHECK(CGRectGetMinY(textFrame) >= CGRectGetMinY(footer) + 15);
