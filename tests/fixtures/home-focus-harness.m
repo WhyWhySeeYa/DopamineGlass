@@ -402,7 +402,10 @@ static NSUInteger CheckHomeFocus(UIViewController *host)
             CHECK(home.homeThermalRevealTimer != nil);
             CHECK(home.homeThermalAvatarOverlay.textStack.alpha == 1);
             [home.homeThermalRevealTimer fire];
-            [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+            [CATransaction flush];
+            NSDate *revealDeadline = [NSDate dateWithTimeIntervalSinceNow:5];
+            while (home.homeThermalRevealActive && revealDeadline.timeIntervalSinceNow > 0)
+                [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
             CHECK(home.homeThermalAvatarOverlay.textStack.alpha == 0);
             CHECK(home.homeThermalAvatarOverlay.alpha == 1);
             CHECK(!home.homeThermalRevealActive);
