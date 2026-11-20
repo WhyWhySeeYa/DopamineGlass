@@ -383,6 +383,7 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
 
 @interface SceneDelegate : UIResponder <UIWindowSceneDelegate>
 @property(nonatomic, strong) UIWindow *window;
+@property(nonatomic) BOOL checksStarted;
 @end
 @implementation SceneDelegate
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)options
@@ -392,7 +393,13 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
     UIViewController *host = [UIViewController new];
     self.window.rootViewController = host;
     [self.window makeKeyAndVisible];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+}
+- (void)sceneDidBecomeActive:(UIScene *)scene
+{
+    if (self.checksStarted) return;
+    self.checksStarted = YES;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController *host = self.window.rootViewController;
         NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
         NSDictionary *report;
         @try { report = RunChecks(host, documents); }

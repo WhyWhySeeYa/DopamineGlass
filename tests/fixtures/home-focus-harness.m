@@ -253,7 +253,10 @@ static NSUInteger CheckHomeFocus(UIViewController *host)
                 home.homeEntranceReady = YES;
                 [home startHomeEntranceIfReady];
                 UIViewPropertyAnimator *entrance = home.homeEntranceAnimator;
-                CHECK(entrance != nil);
+                if (!entrance) @throw [NSException exceptionWithName:@"LayoutFailure"
+                    reason:[NSString stringWithFormat:@"entrance missing: viewport=%lu prepared=%d ready=%d visible=%d scene=%ld window=%@",
+                        (unsigned long)cases, home.homeEntrancePrepared, home.homeEntranceReady, home.informationVisible,
+                        (long)home.view.window.windowScene.activationState, home.view.window] userInfo:nil];
                 [home startHomeEntranceIfReady];
                 CHECK(home.homeEntranceAnimator == entrance);
                 NSArray<UIView *> *entranceViews = home.homeEntranceViews;
