@@ -258,8 +258,11 @@ static NSUInteger CheckHomeFocus(UIViewController *host)
                 CHECK(home.homeEntranceAnimator == entrance);
                 NSArray<UIView *> *entranceViews = home.homeEntranceViews;
                 if (cases == 0) {
-                    // Let one entrance really finish; other sizes interrupt halfway.
-                    [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.85]];
+                    // Wait for the production completion callback, not a narrow
+                    // wall-clock estimate on a busy software-rendered simulator.
+                    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:10];
+                    while (home.homeEntranceAnimator && deadline.timeIntervalSinceNow > 0)
+                        [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
                 } else {
                     [entrance pauseAnimation];
                     entrance.fractionComplete = 0.45;
