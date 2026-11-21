@@ -3,6 +3,12 @@
   "targetBase": "e7df9a00c0429202656551127b8a384c76064cf6",
   "sourceCommit": "6538e974251ede1c662a2e4f696b056a461f6d0d",
   "requiresRebuiltBasebin": true,
+  "buildDependencyRepair": {
+    "path": "BaseBin/ChOma",
+    "unavailable": "4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6",
+    "replacement": "7dccded6bc17081c08f5f5cdbd7a4b051543a825",
+    "reason": "Restore the available pin from parent of upstream 44604a9, also pinned by the current XPF; unavailable source cannot be compared. Full build and device validation still required."
+  },
   "runtimeFiles": {
     "BaseBin/roothidehooks/src/RCLowPowerSchedule.h": "18b11be4f13558d97e788718f6e6821e88c611216dc5adcf385c511d99468aa4",
     "BaseBin/roothidehooks/src/RCBatteryRecord.h": "2c9c3cbccaeb33cdcdcb7907e974b6ee154e43d6e027de896237290650491cbb",
@@ -15,7 +21,7 @@
     "custom mount manager",
     "license issuer desktop tools"
   ],
-  "nativeBuild": "NOT RUN",
+  "nativeBuild": "APP AND ARM64/ARM64E MODULE COMPILE PASSED; FULL INSTALLER NOT BUILT",
   "deviceValidation": "NOT RUN",
   "validation": {
     "sourceTests": {
@@ -29,9 +35,22 @@
       "failed": 0
     },
     "boundaryChecks": 13,
-    "nativeBuild": "NOT RUN",
-    "nativeHarness": "NOT RUN",
+    "nativeBuild": "APP AND ARM64/ARM64E MODULE COMPILE PASSED",
+    "nativeHarness": "FOUNDATION PASSED; UIKIT RESULT RECORDED IN CLOUD AUDIT",
     "deviceTests": "NOT RUN"
+  },
+  "cloudAudit": {
+    "productionCodeCommit": "432671c7ac6754f4411a909760ccf6971445ba75",
+    "nativeCompileRun": 44790059639,
+    "nativeCompileConclusion": "success",
+    "macOSRegression": { "total": 137, "passed": 136, "failed": 0, "skipped": 1 },
+    "pushedCommit": "05fb2d613d5d70dab818c73a75c6c10a5e83831b",
+    "uiKitRun": 44795923786,
+    "uiKitConclusion": "UNCONFIRMED; last observed in_progress; subsequent status query rejected",
+    "previousUiKitRun": 44794211665,
+    "previousUiKitConclusion": "failure: duplicate footer labels after rapid batch updates; test cleanup timing amended, verification pending",
+    "fullBuildBlocker": "Pinned ChOma commit 4e4f8849e7a2025ab1717fe0a214d6363b9c1cc6 is unavailable from the configured remote",
+    "installerProduced": false
   },
   "runtimeAdaptations": {
     "BaseBin/roothidehooks/src/RCLowPowerSchedule.h": {

@@ -355,6 +355,7 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
             CGFloat minimum = -table.contentInset.top;
             CGFloat maximum = MAX(minimum, table.contentSize.height - table.bounds.size.height + table.contentInset.bottom);
             for (NSUInteger i = 0; i < 200; i++) {
+                @autoreleasepool {
                 CGPoint requested = CGPointMake(0.0, minimum + (maximum - minimum) * (i % 51) / 50.0);
                 [table setContentOffset:requested animated:NO];
                 Layout(page);
@@ -363,6 +364,9 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
                 CheckLayers(page);
                 CheckGlassAlignment(page);
                 checks++;
+                }
+                if (i % 25 == 24)
+                    [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
             }
             // A reload inserts/reuses UIKit content containers; the background
             // must still stay beneath their text and controls afterwards.
@@ -416,9 +420,11 @@ static NSDictionary *RunChecks(UIViewController *host, NSString *documents)
     // The harness pumps the run loop while waiting for animation completion.
     // Run from a timer so that a nested loop can service main-queue callbacks;
     // doing the whole test inside a main-queue block prevents reentrant drain.
-    [NSTimer scheduledTimerWithTimeInterval:0.01 repeats:NO block:^(NSTimer *timer) {
+    [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer *timer) {
         UIViewController *host = self.window.rootViewController;
         NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        if (![NSFileManager.defaultManager fileExistsAtPath:[documents stringByAppendingPathComponent:@"start-checks"]]) return;
+        [timer invalidate];
         NSDictionary *report;
         @try { report = RunChecks(host, documents); }
         @catch (NSException *exception) { report = @{@"status": @"failed", @"reason": exception.description}; }

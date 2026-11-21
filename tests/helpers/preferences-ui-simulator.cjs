@@ -122,9 +122,12 @@ async function run() {
     // A clean iOS runtime migrates its data store on first boot; allow that once, bounded.
     await command(['simctl', 'bootstatus', device, '-b'], 420000);
     await command(['simctl', 'install', device, app], 120000);
-    await command(['simctl', 'launch', device, 'test.roothide.preferences-layout']);
     const data = await command(['simctl', 'get_app_container', device, 'test.roothide.preferences-layout', 'data']);
     const documents = path.join(data, 'Documents');
+    await command(['simctl', 'launch', device, 'test.roothide.preferences-layout']);
+    // Begin stress work only after SpringBoard has completed the launch request.
+    fs.mkdirSync(documents, { recursive: true });
+    fs.writeFileSync(path.join(documents, 'start-checks'), 'start');
     const report = path.join(documents, 'report.json');
     // The full suite includes 2400 table layouts plus home animations and
     // schedule stress checks. Hosted Intel runs can exceed 90 seconds while

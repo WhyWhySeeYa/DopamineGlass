@@ -44,7 +44,12 @@ const checks = {
     const protectedPaths = manifest.contract.protectedPaths;
     const integrations = ['Application/Dopamine/Jailbreak/DOEnvironmentManager.h',
       'Application/Dopamine/Jailbreak/DOEnvironmentManager.m', 'BaseBin/roothidehooks/src/springboard.x'];
-    const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles)]);
+    const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles), 'BaseBin/ChOma']);
+    // Recover the available upstream pin also used by this exact XPF revision.
+    // Do not allow an arbitrary replacement under the build-repair exception.
+    const chomaPin = '7dccded6bc17081c08f5f5cdbd7a4b051543a825';
+    assert.equal(git('ls-files', '--stage', 'BaseBin/ChOma').trim().split(/\s+/)[1], chomaPin);
+    assert.equal(migration.buildDependencyRepair.replacement, chomaPin);
     for (const changed of [git('diff', '--name-only', manifest.upstream.commit, '--', ...protectedPaths),
       git('ls-files', '--others', '--exclude-standard', '--', ...protectedPaths)])
       for (const file of changed.trim().split('\n').filter(Boolean)) assert.ok(allowed.has(file), 'Protected upstream path: ' + file);
