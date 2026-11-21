@@ -66,7 +66,7 @@ test('storage is bounded and atomic and writes are restricted to the unsandboxed
   const write = body(header, 'static inline BOOL rcLowPowerWriteDictionary(');
   assert.ok(write.indexOf('setAttributes:') < write.indexOf('rename('));
   assert.match(write, /if \(!success\) \[manager removeItemAtPath:temporary/);
-  const save = body(environment, '- (BOOL)saveLowPowerScheduleEnabled:');
+  const save = body(environment, '- (BOOL)saveLowPowerScheduleConfiguration:');
   assert.match(save, /!self\.isJailbroken/);
   assert.match(save, /rcLowPowerConfigurationValid\(configuration\)/);
   assert.match(save, /runUnsandboxed/);
@@ -79,8 +79,11 @@ test('scheduler checks private ABI, arms the next event before applying mode, an
   assert.match(refresh, /rcLowPowerAPIsAvailable\(\)/);
   assert.match(refresh, /@try/);
   assert.match(refresh, /@catch/);
-  assert.ok(refresh.indexOf('[self armForDate:next[@"Date"]]') <
-    refresh.indexOf('setPowerMode:'));
+  const apply = body(runtime, '- (NSString *)applyEvent:');
+  assert.ok(refresh.indexOf('[self armForDate:next[@"Date"]]') < refresh.indexOf('[self applyEvent:'));
+  assert.ok(refresh.indexOf('rcLowPowerEventIsDeferred(configuration, previous)') < refresh.indexOf('[self applyEvent:'));
+  assert.ok(apply.indexOf('configurationIsCurrent:configuration') < apply.indexOf('requestPowerMode:target'));
+  assert.match(apply, /if \(self\.systemLowPowerEnabled == target\) \{\s*self\.lastHandled = event/);
   assert.match(refresh, /if \(!\[configuration\[@"Enabled"\] boolValue\]\)/);
   assert.match(refresh, /self\.retryCount < 4/);
   assert.match(refresh, /self\.retryAfter/);
@@ -95,7 +98,9 @@ test('settings exposes the schedule while jailbroken and UI never applies system
   assert.match(controller, /DOScheduleTimePicker\(minute, self/);
   assert.match(read('Application/Dopamine/UI/Settings/DOScheduleTimePicker.h'), /UIDatePickerModeTime/);
   assert.match(controller, /start == end/);
-  assert.doesNotMatch(controller, /RC_LOW_POWER_QUERY|notify_post|UIActivityIndicatorView|scheduledTimer|dispatch_after/);
+  assert.doesNotMatch(controller, /RC_LOW_POWER_QUERY|notify_post|UIActivityIndicatorView|scheduledTimer/);
+  assert.equal((controller.match(/dispatch_after\(/g) || []).length, 1);
+  assert.doesNotMatch(body(controller, '- (void)finishScheduleWait:'), /beginScheduleWait:|writeConfiguration:/);
   assert.match(controller, /runtimeStatus\[@"Revision"\] isEqual:self\.savedConfiguration\[@"Revision"\]/);
   assert.match(controller, /notify_cancel\(self\.statusToken\)/);
   assert.doesNotMatch(controller, /setPowerMode:/);
@@ -103,8 +108,35 @@ test('settings exposes the schedule while jailbroken and UI never applies system
   const disabled = refresh.match(
     /if \(!\[configuration\[@"Enabled"\] boolValue\]\) \{([\s\S]*?)\n    \}/,
   )[1];
-  assert.match(disabled, /publishStatus:@"disabled"/);
-  assert.doesNotMatch(disabled, /setPowerMode/);
+  assert.match(disabled, /disableWithConfiguration:configuration/);
+  const stop = body(runtime, '- (void)disableWithConfiguration:');
+  assert.match(body(runtime, '- (BOOL)requestPowerOff'), /requestPowerMode:NO/);
+  assert.match(stop, /saved\[@"DisableRequest"\] isEqual:request/);
+  assert.match(stop, /!self\.systemLowPowerEnabled\) self\.disableState = @"disabled"/);
+  assert.match(stop, /self\.disableAttempts >= 3\) self\.disableState = @"applyFailed"/);
+});
+
+test('the enable prompt defers both edges and status never predicts an unconfirmed stop', () => {
+  const prompt = body(controller, '- (BOOL)offerStartChoiceIfNeeded');
+  assert.match(prompt, /previous\[@"PowerMode"\]/);
+  assert.match(prompt, /enablePlanSkippingThrough:end/);
+  const prepare = body(controller, '- (void)commitScheduleWithSkipThrough:');
+  assert.match(prepare, /configuration\[@"SkipThrough"\] = endOfSkippedWindow/);
+  const status = body(controller, '- (NSString *)statusText');
+  assert.doesNotMatch(status, /rcLowPowerEvent\(/);
+  assert.match(status, /!\[next\[@"PowerMode"\] boolValue\] && systemOn/);
+});
+
+test('scheduler confirms system changes, rejects stale writes and skips a deferred window', {
+  skip: process.platform !== 'darwin' ? 'Requires macOS Foundation.' : false,
+}, t => {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'schedule-disable-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const run = require('node:child_process').execFileSync;
+  const bin = path.join(dir, 'test');
+  run('xcrun', ['clang', '-fobjc-arc', '-fblocks', '-framework', 'Foundation', '-I',
+    path.join(root, 'BaseBin/roothidehooks/src'), path.join(root, 'tests/fixtures/lowpower-disable-harness.m'), '-o', bin]);
+  run(bin, [dir]);
 });
 
 test('low-power schedule uses the same full-screen navigation frame as settings', () => {

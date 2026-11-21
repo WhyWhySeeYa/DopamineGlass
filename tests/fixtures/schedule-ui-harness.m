@@ -13,7 +13,7 @@
 - (NSDictionary *)lowPowerScheduleStatus;
 - (NSDictionary *)batteryRecordConfiguration;
 - (NSDictionary *)batteryRecordStatus;
-- (BOOL)saveLowPowerScheduleEnabled:(BOOL)enabled startMinute:(NSInteger)start endMinute:(NSInteger)end error:(NSError **)error;
+- (BOOL)saveLowPowerScheduleConfiguration:(NSDictionary *)configuration error:(NSError **)error;
 - (BOOL)saveBatteryRecordConfiguration:(NSDictionary *)configuration error:(NSError **)error;
 - (NSString *)sendBatteryRecordCommand:(NSString *)command error:(NSError **)error;
 @end
@@ -23,9 +23,9 @@
 - (NSDictionary *)lowPowerScheduleStatus { return self.lowState ?: @{}; }
 - (NSDictionary *)batteryRecordConfiguration { return self.batteryConfig ?: rcBatteryDefaultConfiguration(); }
 - (NSDictionary *)batteryRecordStatus { return self.batteryState ?: @{}; }
-- (BOOL)saveLowPowerScheduleEnabled:(BOOL)enabled startMinute:(NSInteger)start endMinute:(NSInteger)end error:(NSError **)error
+- (BOOL)saveLowPowerScheduleConfiguration:(NSDictionary *)configuration error:(NSError **)error
 {
-    self.lowConfig = @{@"Version": @1, @"Enabled": @(enabled), @"StartMinute": @(start), @"EndMinute": @(end), @"Revision": NSUUID.UUID.UUIDString};
+    self.lowConfig = configuration;
     return YES;
 }
 - (BOOL)saveBatteryRecordConfiguration:(NSDictionary *)configuration error:(NSError **)error { self.batteryConfig = configuration; return YES; }
@@ -102,6 +102,12 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
     [nav pushViewController:container animated:NO];
     [nav.view layoutIfNeeded];
     DOLowPowerScheduleController *low = container.pages[0];
+    // Keep the first enable outside its window regardless of the test clock.
+    NSDateComponents *nowComponents = [rcLowPowerLocalCalendar() components:NSCalendarUnitHour | NSCalendarUnitMinute fromDate:NSDate.date];
+    NSInteger nowMinute = nowComponents.hour * 60 + nowComponents.minute;
+    low.lastStartMinute = (nowMinute + 10) % 1440;
+    low.lastEndMinute = (nowMinute + 20) % 1440;
+    if (low.lastEndMinute == 60) low.lastEndMinute = 61;
     low.enabledSwitch.on = YES;
     low.lastStartMinute = 60;
     low.lastEndMinute = 390;

@@ -43,14 +43,17 @@ static BOOL rcLowPowerMethodMatches(Method method, const char *returns, const ch
     return YES;
 }
 
-static BOOL rcLowPowerAPIsAvailable(void)
+static BOOL rcPowerSetterAvailable(void)
 {
     Class power = NSClassFromString(@"_PMLowPowerMode");
+    return rcLowPowerMethodMatches(class_getClassMethod(power, @selector(sharedInstance)), "@", "") &&
+        rcLowPowerMethodMatches(class_getInstanceMethod(power, @selector(setPowerMode:fromSource:)), "Bc", "q@");
+}
+
+static BOOL rcLowPowerAPIsAvailable(void)
+{
     Class timer = NSClassFromString(@"PCPersistentTimer");
-    return power && timer &&
-        rcLowPowerMethodMatches(class_getClassMethod(power, @selector(sharedInstance)), "@", "") &&
-        rcLowPowerMethodMatches(class_getInstanceMethod(power, @selector(setPowerMode:fromSource:)), "Bc", "q@") &&
-        rcLowPowerMethodMatches(class_getInstanceMethod(timer,
+    return rcPowerSetterAvailable() && rcLowPowerMethodMatches(class_getInstanceMethod(timer,
             @selector(initWithFireDate:serviceIdentifier:target:selector:userInfo:)), "@", "@@@:@") &&
         rcLowPowerMethodMatches(class_getInstanceMethod(timer, @selector(setDisableSystemWaking:)), "v", "b") &&
         rcLowPowerMethodMatches(class_getInstanceMethod(timer, @selector(setUserVisible:)), "v", "b") &&
@@ -104,6 +107,12 @@ static id rcSharedLowPowerScheduler;
 @interface RCLowPowerScheduler : NSObject
 @property(nonatomic, strong) id<RCPersistentTimerAPI> timer;
 @property(nonatomic, copy) NSDictionary *lastHandled;
+@property(nonatomic, copy) NSString *disableRequest;
+@property(nonatomic, copy) NSString *disableState;
+@property(nonatomic) BOOL awaitingReadback;
+@property(nonatomic) NSUInteger disableAttempts;
+@property(nonatomic, strong) NSDictionary *readbackEvent;
+@property(nonatomic) BOOL awaitingEventReadback;
 @property(nonatomic, copy) NSString *retryKey;
 @property(nonatomic) NSUInteger retryCount;
 @property(nonatomic, strong) NSDate *retryAfter;
@@ -120,6 +129,7 @@ static id rcSharedLowPowerScheduler;
     if (configuration[@"Revision"]) status[@"Revision"] = configuration[@"Revision"];
     if (next) status[@"Next"] = next;
     if (self.lastHandled) status[@"LastHandled"] = self.lastHandled;
+    if (self.disableRequest) status[@"DisableRequest"] = self.disableRequest;
     NSString *bootSession = rcLowPowerBootSession();
     if (bootSession) status[@"BootSession"] = bootSession;
     if (rcLowPowerWriteDictionary(status, rcLowPowerStatusPath(root), nil))
@@ -151,6 +161,119 @@ static id rcSharedLowPowerScheduler;
     if (timer == self.timer) [self refresh];
 }
 
+- (BOOL)systemLowPowerEnabled { return NSProcessInfo.processInfo.lowPowerModeEnabled; }
+
+- (BOOL)configurationIsCurrent:(NSDictionary *)configuration root:(NSString *)root
+{
+    NSDictionary *latest = rcLowPowerReadDictionary(rcLowPowerConfigurationPath(root));
+    return [latest isEqualToDictionary:configuration];
+}
+
+- (BOOL)requestPowerMode:(BOOL)enabled
+{
+    if (!rcPowerSetterAvailable()) return self.systemLowPowerEnabled == enabled;
+    id<RCLowPowerModeAPI> power = [(Class<RCLowPowerModeAPI>)NSClassFromString(@"_PMLowPowerMode") sharedInstance];
+#ifndef RC_LOW_POWER_TEST
+    rcBatteryRecordBeforePowerChange();
+#endif
+    BOOL accepted = [power setPowerMode:enabled ? 1 : 0 fromSource:@"com.dopaminerh.rc9.low-power-schedule"];
+#ifndef RC_LOW_POWER_TEST
+    rcBatteryRecordAfterPowerChange();
+#endif
+    return accepted;
+}
+
+- (BOOL)requestPowerOff
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ dlopen("/System/Library/PrivateFrameworks/LowPowerMode.framework/LowPowerMode", RTLD_LAZY | RTLD_LOCAL); });
+    return [self requestPowerMode:NO];
+}
+
+- (void)disableWithConfiguration:(NSDictionary *)configuration root:(NSString *)root
+{
+    NSString *request = configuration[@"DisableRequest"];
+    if (![request isKindOfClass:NSString.class]) {
+        self.disableRequest = nil;
+        self.disableState = nil;
+        self.awaitingReadback = NO;
+        [self publishStatus:@"disabled" configuration:configuration root:root next:nil];
+        return;
+    }
+    if (![request isEqual:self.disableRequest]) {
+        NSDictionary *saved = rcLowPowerReadDictionary(rcLowPowerStatusPath(root));
+        self.disableRequest = request;
+        self.disableAttempts = 0;
+        self.awaitingReadback = NO;
+        NSString *state = [saved[@"DisableRequest"] isEqual:request] &&
+            [saved[@"BootSession"] isEqual:rcLowPowerBootSession()] ? saved[@"State"] : nil;
+        self.disableState = [@[@"disabled", @"applyFailed"] containsObject:state ?: @""] ? state : nil;
+        // An interrupted verification has no completion to reuse after a respring.
+    }
+    if ([self.disableState isEqual:@"verifying"] && !self.awaitingReadback) {
+        if (!self.systemLowPowerEnabled) self.disableState = @"disabled";
+        else if (self.disableAttempts >= 3) self.disableState = @"applyFailed";
+    }
+    if (!self.awaitingReadback && ![@[@"disabled", @"applyFailed"] containsObject:self.disableState ?: @""]) {
+        if (![self configurationIsCurrent:configuration root:root]) return;
+        // Send OFF even when readback is already off: an earlier ON can still be in flight.
+        [self requestPowerOff];
+        self.disableAttempts++;
+        self.disableState = @"verifying";
+        self.awaitingReadback = YES;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            if (![request isEqual:self.disableRequest]) return;
+            self.awaitingReadback = NO;
+            [self refresh];
+        });
+    }
+    [self publishStatus:self.disableState configuration:configuration root:root next:nil];
+}
+
+- (NSString *)applyEvent:(NSDictionary *)event configuration:(NSDictionary *)configuration
+                   root:(NSString *)root now:(NSDate *)now
+{
+    if ([self.lastHandled isEqual:event]) return @"scheduled";
+    NSString *key = [NSString stringWithFormat:@"%@:%@:%@", event[@"Revision"], event[@"Date"], event[@"PowerMode"]];
+    if (![self.retryKey isEqual:key]) {
+        self.retryKey = key;
+        self.retryCount = 0;
+        self.retryAfter = nil;
+        self.readbackEvent = nil;
+        self.awaitingEventReadback = NO;
+    }
+    BOOL target = [event[@"PowerMode"] boolValue];
+    if (self.readbackEvent) {
+        if (self.awaitingEventReadback) return @"verifying";
+        self.readbackEvent = nil;
+        self.awaitingEventReadback = NO;
+        if (self.systemLowPowerEnabled == target) {
+            self.lastHandled = event;
+            self.retryAfter = nil;
+            return @"scheduled";
+        }
+        self.retryAfter = [now dateByAddingTimeInterval:60.0 * self.retryCount];
+    }
+    if (self.retryCount >= 4 || (self.retryAfter && [now compare:self.retryAfter] == NSOrderedAscending))
+        return @"applyFailed";
+    // A save from the app can supersede this callback while it is arming its timer.
+    if (![self configurationIsCurrent:configuration root:root]) return nil;
+    self.retryCount++;
+    if (![self requestPowerMode:target] && self.systemLowPowerEnabled != target) {
+        self.retryAfter = [now dateByAddingTimeInterval:60.0 * self.retryCount];
+        return @"applyFailed";
+    }
+    self.retryAfter = nil;
+    self.readbackEvent = event;
+    self.awaitingEventReadback = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        if (self.readbackEvent != event) return;
+        self.awaitingEventReadback = NO;
+        [self refresh];
+    });
+    return @"verifying";
+}
+
 - (void)refresh
 {
     // All entry points run on SpringBoard's main queue; disabling cannot race an
@@ -161,7 +284,7 @@ static id rcSharedLowPowerScheduler;
     if (!root) return;
     NSDictionary *configuration = rcLowPowerReadDictionary(rcLowPowerConfigurationPath(root));
     if (!configuration) {
-        BOOL exists = [NSFileManager.defaultManager fileExistsAtPath:rcLowPowerConfigurationPath(root)];
+        BOOL exists = [NSFileManager.defaultManager fileExistsAtPath:rcScheduleReadPath(rcLowPowerConfigurationPath(root))];
         [self publishStatus:exists ? @"invalidConfiguration" : @"disabled"
               configuration:nil root:root next:nil];
         return;
@@ -174,13 +297,21 @@ static id rcSharedLowPowerScheduler;
         self.retryKey = nil;
         self.retryCount = 0;
         self.retryAfter = nil;
-        [self publishStatus:@"disabled" configuration:configuration root:root next:nil];
+        self.readbackEvent = nil;
+        self.awaitingEventReadback = NO;
+        @try { [self disableWithConfiguration:configuration root:root]; }
+        @catch (__unused NSException *exception) {
+            self.disableState = @"runtimeFailed";
+            [self publishStatus:self.disableState configuration:configuration root:root next:nil];
+        }
         return;
     }
+    self.disableRequest = nil;
+    self.disableState = nil;
+    self.awaitingReadback = NO;
     @try {
         static dispatch_once_t frameworksOnce;
         dispatch_once(&frameworksOnce, ^{
-            // Disabled plans never load either optional system framework.
             // Keep handles alive while cached Objective-C classes are in use.
             dlopen("/System/Library/PrivateFrameworks/LowPowerMode.framework/LowPowerMode", RTLD_LAZY | RTLD_LOCAL);
             dlopen("/System/Library/PrivateFrameworks/PersistentConnection.framework/PersistentConnection", RTLD_LAZY | RTLD_LOCAL);
@@ -192,7 +323,7 @@ static id rcSharedLowPowerScheduler;
         NSDate *now = rcLowPowerNow();
         NSCalendar *calendar = rcLowPowerLocalCalendar();
         NSDictionary *previous = rcLowPowerEvent(configuration, now, calendar, NO);
-        NSDictionary *next = rcLowPowerEvent(configuration, now, calendar, YES);
+        NSDictionary *next = rcLowPowerNextScheduledEvent(configuration, now, calendar);
         if (!previous || !next) {
             [self publishStatus:@"calendarFailed" configuration:configuration root:root next:nil];
             return;
@@ -204,6 +335,10 @@ static id rcSharedLowPowerScheduler;
             [self publishStatus:@"timerFailed" configuration:configuration root:root next:next];
             return;
         }
+        if (rcLowPowerEventIsDeferred(configuration, previous)) {
+            [self publishStatus:@"scheduled" configuration:configuration root:root next:next];
+            return;
+        }
         if (!self.lastHandled) {
             NSDictionary *saved = rcLowPowerReadDictionary(rcLowPowerStatusPath(root));
             // Preserve manual overrides across a respring, but catch up after
@@ -213,44 +348,13 @@ static id rcSharedLowPowerScheduler;
                 [saved[@"LastHandled"] isKindOfClass:NSDictionary.class])
                 self.lastHandled = saved[@"LastHandled"];
         }
-        BOOL applied = YES;
-        if (![self.lastHandled isEqual:event]) {
-            NSString *key = [NSString stringWithFormat:@"%@:%@", event[@"Revision"], event[@"Date"]];
-            if (![self.retryKey isEqual:key]) {
-                self.retryKey = key;
-                self.retryCount = 0;
-                self.retryAfter = nil;
-            }
-            // Idempotent set, never toggle. Manual changes survive until the
-            // next event, including a respring within the same daily interval.
-            applied = NO;
-            if (self.retryCount < 4 && (!self.retryAfter ||
-                [now compare:self.retryAfter] != NSOrderedAscending)) {
-                self.retryCount++;
-                id<RCLowPowerModeAPI> power = [(Class<RCLowPowerModeAPI>)NSClassFromString(@"_PMLowPowerMode") sharedInstance];
-                #ifndef RC_LOW_POWER_TEST
-                rcBatteryRecordBeforePowerChange();
-#endif
-                applied = [power setPowerMode:[previous[@"PowerMode"] longLongValue]
-                                  fromSource:@"com.dopaminerh.rc9.low-power-schedule"];
-                #ifndef RC_LOW_POWER_TEST
-                rcBatteryRecordAfterPowerChange();
-#endif
-                if (applied) self.lastHandled = event;
-                else self.retryAfter = [now dateByAddingTimeInterval:60.0 * self.retryCount];
-            }
-        }
-        if (!applied) {
-            // At most three retries per event, not a background polling loop.
-            if (self.retryCount < 4 && [self.retryAfter compare:next[@"Date"]] == NSOrderedAscending)
-                [self armForDate:self.retryAfter];
-        } else {
-            self.retryKey = nil;
-            self.retryCount = 0;
-            self.retryAfter = nil;
-        }
-        [self publishStatus:applied ? @"scheduled" : @"applyFailed"
-              configuration:configuration root:root next:next];
+        NSString *state = [self applyEvent:event configuration:configuration root:root now:now];
+        if (!state) return;
+        // Retry before the next edge only. The OFF timer stays armed during readback.
+        if ([state isEqual:@"applyFailed"] && self.retryCount < 4 && self.retryAfter &&
+            [self.retryAfter compare:next[@"Date"]] == NSOrderedAscending)
+            [self armForDate:self.retryAfter];
+        [self publishStatus:state configuration:configuration root:root next:next];
     }
     @catch (__unused NSException *exception) {
         [self.timer invalidate];
