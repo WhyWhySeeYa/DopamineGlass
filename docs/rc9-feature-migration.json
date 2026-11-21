@@ -10,9 +10,9 @@
     "reason": "Restore the available pin from parent of upstream 44604a9, also pinned by the current XPF; unavailable source cannot be compared. Full build and device validation still required."
   },
   "runtimeFiles": {
-    "BaseBin/roothidehooks/src/RCLowPowerSchedule.h": "18b11be4f13558d97e788718f6e6821e88c611216dc5adcf385c511d99468aa4",
+    "BaseBin/roothidehooks/src/RCLowPowerSchedule.h": "a6d4708c10b6249d5c16765c463cc37d064e5b9cd87af5068b46a16ebf926aa1",
     "BaseBin/roothidehooks/src/RCBatteryRecord.h": "2c9c3cbccaeb33cdcdcb7907e974b6ee154e43d6e027de896237290650491cbb",
-    "BaseBin/roothidehooks/src/lowpowerschedule.m": "b5e1974ed90e6e5c77a483e0574683e9483d91bc0f2f3faef4268131acbf2512",
+    "BaseBin/roothidehooks/src/lowpowerschedule.m": "0112c1c519b3ffb95950fcabbf840f8f8dea48ba6cef3f0973c2af5823b6c993",
     "BaseBin/roothidehooks/src/batteryrecord.m": "6fd0a95bfd9cd0faf30691062a5ef5b52ad5eea8a84a03986ff233a80e1ec134"
   },
   "excluded": [

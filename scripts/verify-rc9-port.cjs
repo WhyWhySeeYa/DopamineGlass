@@ -44,7 +44,10 @@ const checks = {
     const protectedPaths = manifest.contract.protectedPaths;
     const integrations = ['Application/Dopamine/Jailbreak/DOEnvironmentManager.h',
       'Application/Dopamine/Jailbreak/DOEnvironmentManager.m', 'BaseBin/roothidehooks/src/springboard.x'];
-    const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles), 'BaseBin/ChOma', 'Application/Makefile']);
+    const runtimeVersionPath = 'BaseBin/_external/basebin/.version-roothide';
+    assert.equal(read(runtimeVersionPath).trim(), '31');
+    assert.equal(normalize(original(runtimeVersionPath)), '30');
+    const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles), 'BaseBin/ChOma', 'Application/Makefile', runtimeVersionPath]);
     const assets = 'Application/Dopamine/Assets.xcassets/';
     const primary = assets + 'AppIcon.appiconset';
     assert.deepEqual(fs.readdirSync(path.join(root, assets)).filter(name => name.endsWith('.appiconset')), ['AppIcon.appiconset']);
@@ -78,13 +81,13 @@ const checks = {
     let environment = read(integrations[1]).replace(/\r\n/g, '\n');
     for (const signature of ['- (NSDictionary *)batteryRecordConfiguration', '- (NSDictionary *)batteryRecordStatus',
       '- (BOOL)writeBatteryRecordValue:', '- (BOOL)saveBatteryRecordConfiguration:', '- (NSString *)sendBatteryRecordCommand:',
-      '- (NSDictionary *)lowPowerScheduleConfiguration', '- (NSDictionary *)lowPowerScheduleStatus', '- (BOOL)saveLowPowerScheduleEnabled:'])
+      '- (NSDictionary *)lowPowerScheduleConfiguration', '- (NSDictionary *)lowPowerScheduleStatus', '- (BOOL)saveLowPowerScheduleConfiguration:'])
       environment = environment.replace(method(environment, signature) + '\n\n', '');
     for (const line of ['#import "../../../BaseBin/roothidehooks/src/RCLowPowerSchedule.h"',
       '#import "../../../BaseBin/roothidehooks/src/RCBatteryRecord.h"', '#import <notify.h>', '#import <errno.h>'])
       environment = environment.replace(line + '\n', '');
     assert.equal(normalize(environment), normalize(original(integrations[1])), 'Existing environment manager stays exact');
-    const header = read(integrations[0]).replace(/\r\n/g, '\n').replace(/^- \(NSDictionary \*\)batteryRecordConfiguration;[\s\S]*?endMinute:\(NSInteger\)endMinute error:\(NSError \*\*\)error;\n/m, '');
+    const header = read(integrations[0]).replace(/\r\n/g, '\n').replace(/^- \(NSDictionary \*\)batteryRecordConfiguration;[\s\S]*?saveLowPowerScheduleConfiguration:\(NSDictionary \*\)configuration error:\(NSError \*\*\)error;\n/m, '');
     assert.equal(normalize(header), normalize(original(integrations[0])), 'Existing environment header stays exact');
     const springboard = read(integrations[2]).replace(/\r\n/g, '\n').replace(/^\textern void rc(?:LowPowerSchedule|BatteryRecord)Start\(void\);\n|^\trc(?:LowPowerSchedule|BatteryRecord)Start\(\);\n/gm, '');
     assert.equal(normalize(springboard), normalize(original(integrations[2])), 'Only two sbInit startups may be added');
@@ -205,6 +208,15 @@ const checks = {
         assert.deepEqual(actual[field].slice(0, value[field].length), value[field], id);
         for (const addition of actual[field].slice(value[field].length)) assert.ok(current.objects[addition], addition);
         actual[field] = value[field];
+      }
+      if (id === base.rootObject) {
+        assert.equal(actual.knownRegions.filter(locale => locale === 'zh-Hant').length, 1);
+        actual.knownRegions = actual.knownRegions.filter(locale => locale !== 'zh-Hant');
+      }
+      if (value.isa === 'PBXVariantGroup' && value.name === 'Localizable.strings') {
+        const traditional = actual.children.filter(child => current.objects[child].path === 'zh-Hant.lproj/Localizable.strings');
+        assert.equal(traditional.length, 1);
+        actual.children = actual.children.filter(child => child !== traditional[0]);
       }
       if (actual.isa === 'XCBuildConfiguration' && value.buildSettings.INFOPLIST_KEY_NSPhotoLibraryUsageDescription)
         actual.buildSettings.INFOPLIST_KEY_NSPhotoLibraryUsageDescription = value.buildSettings.INFOPLIST_KEY_NSPhotoLibraryUsageDescription;

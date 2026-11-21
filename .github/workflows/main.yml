@@ -118,6 +118,17 @@ jobs:
           plutil -convert json -o app-info.json "$RUNNER_TEMP/RootHide-Info.plist"
           plutil -lint "$RUNNER_TEMP/RootHide-Themes.plist"
           node scripts/verify-app-entitlements.cjs app-entitlements.json app-info.json
+          for locale in en zh-CN zh-Hans zh-Hant zh-HK zh-TW; do
+            strings="$RUNNER_TEMP/RootHide-$locale-Localizable.strings"
+            unzip -p "$tipa" "Payload/Dopamine.app/$locale.lproj/Localizable.strings" > "$strings"
+            plutil -lint "$strings"
+          done
+          unzip -p "$tipa" Payload/Dopamine.app/basebin.tar > "$RUNNER_TEMP/RootHide-basebin.tar"
+          tar -tf "$RUNNER_TEMP/RootHide-basebin.tar" | grep -E '(^|/)roothidehooks\.dylib$'
+          tar -xOf "$RUNNER_TEMP/RootHide-basebin.tar" basebin/.version-roothide > "$RUNNER_TEMP/RootHide-runtime-version"
+          cmp BaseBin/_external/basebin/.version-roothide "$RUNNER_TEMP/RootHide-runtime-version"
+          expected="$(cat BaseBin/_external/basebin/.version)-$(cat BaseBin/_external/basebin/.version-roothide)"
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$RUNNER_TEMP/RootHide-Info.plist")" = "$expected"
 
       - name: Upload Artifact
         id: dopamine-latest-upload

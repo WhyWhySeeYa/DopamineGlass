@@ -43,6 +43,17 @@ static NSString *ScheduleLocalizedString(NSString *key)
 #define DOLocalizedString(key) ScheduleLocalizedString(key)
 /* PRODUCTION_SCHEDULE_CONTROLLERS */
 
+@interface ScheduleTestPan : UIPanGestureRecognizer
+@property(nonatomic) CGPoint testOffset;
+@property(nonatomic) CGPoint testVelocity;
+@end
+
+@implementation ScheduleTestPan
+- (UIGestureRecognizerState)state { return UIGestureRecognizerStateEnded; }
+- (CGPoint)translationInView:(UIView *)view { return self.testOffset; }
+- (CGPoint)velocityInView:(UIView *)view { return self.testVelocity; }
+@end
+
 static void ScheduleLabels(UIView *view, NSString *text, NSMutableArray<UILabel *> *labels)
 {
     if (view.hidden || view.alpha == 0) return;
@@ -90,8 +101,50 @@ static void CheckScheduleBackdrops(DOLowPowerScheduleController *page)
     CHECK(page.tableView.backgroundView.subviews.count == page.sectionGlassViews.count);
 }
 
+@interface ScheduleWindowTestPage : DOLowPowerScheduleController
+@property(nonatomic, strong) NSDate *testNow;
+@property(nonatomic, strong) UIAlertController *capturedAlert;
+@end
+
+@implementation ScheduleWindowTestPage
+- (NSDate *)scheduleNow { return self.testNow; }
+- (void)presentViewController:(UIViewController *)controller animated:(BOOL)animated completion:(void (^)(void))completion
+{
+    self.capturedAlert = (UIAlertController *)controller;
+}
+@end
+
+static void CheckScheduleStartChoices(void)
+{
+    DOEnvironmentManager *env = DOEnvironmentManager.sharedManager;
+    NSDictionary *original = env.lowConfig;
+    ScheduleWindowTestPage *page = [ScheduleWindowTestPage new];
+    NSCalendar *calendar = rcLowPowerLocalCalendar();
+    page.testNow = [calendar dateBySettingHour:0 minute:33 second:0 ofDate:NSDate.date options:0];
+    [page loadViewIfNeeded];
+    page.lastStartMinute = 31;
+    page.lastEndMinute = 390;
+    page.enabledSwitch.on = YES;
+    [page.enabledSwitch sendActionsForControlEvents:UIControlEventValueChanged];
+    CHECK(!page.enabledSwitch.on && env.lowConfig == original);
+    NSArray *titles = [page.capturedAlert.actions valueForKey:@"title"];
+    CHECK(([titles isEqual:@[DOLocalizedString(@"LowPowerSchedule_StartNow"),
+        DOLocalizedString(@"LowPowerSchedule_WaitForNext"), DOLocalizedString(@"LowPowerSchedule_AdjustTime")]]));
+    NSDate *end = [calendar dateBySettingHour:6 minute:30 second:0 ofDate:page.testNow options:0];
+    [page enablePlanSkippingThrough:end];
+    CHECK([env.lowConfig[@"Enabled"] boolValue] && [env.lowConfig[@"SkipThrough"] isEqual:end]);
+    page.enabledSwitch.on = NO;
+    [page.enabledSwitch sendActionsForControlEvents:UIControlEventValueChanged];
+    CHECK(![env.lowConfig[@"Enabled"] boolValue] && env.lowConfig[@"SkipThrough"] == nil);
+    CHECK([env.lowConfig[@"DisableRequest"] isEqual:env.lowConfig[@"Revision"]]);
+    [page enablePlanSkippingThrough:nil];
+    CHECK([env.lowConfig[@"Enabled"] boolValue] && env.lowConfig[@"SkipThrough"] == nil && env.lowConfig[@"DisableRequest"] == nil);
+    env.lowConfig = original;
+}
+
 static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
 {
+    CheckScheduleStartChoices();
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:[UIViewController new]];
     nav.navigationBarHidden = YES;
     [host addChildViewController:nav];
@@ -102,15 +155,34 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
     [nav pushViewController:container animated:NO];
     [nav.view layoutIfNeeded];
     DOLowPowerScheduleController *low = container.pages[0];
+    CHECK(container.pagePan.delegate == container && container.pagePan.view == container.contentView);
+    ScheduleTestPan *swipe = [[ScheduleTestPan alloc] initWithTarget:nil action:NULL];
+    swipe.testOffset = CGPointMake(-20, 80);
+    [container pagePanned:swipe];
+    CHECK(container.selectedPage == low);
+    swipe.testOffset = CGPointMake(-8, 0);
+    [container pagePanned:swipe];
+    CHECK(container.selectedPage == low);
+    swipe.testOffset = CGPointMake(-75, 5);
+    [container pagePanned:swipe];
+    [container finishPageTransition];
+    CHECK(container.selectedPage == container.pages[1] && container.modeControl.selectedIndex == 1);
+    [container pagePanned:swipe]; // No wrapping past the last page.
+    CHECK(container.selectedPage == container.pages[1]);
+    swipe.testOffset = CGPointMake(75, 5);
+    [container pagePanned:swipe];
+    [container finishPageTransition];
+    CHECK(container.selectedPage == low && container.modeControl.selectedIndex == 0);
+    container.contentView.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
+    CHECK([container pageIndexForHorizontalMovement:75] == 1);
+    container.contentView.semanticContentAttribute = UISemanticContentAttributeUnspecified;
     // Keep the first enable outside its window regardless of the test clock.
     NSDateComponents *nowComponents = [rcLowPowerLocalCalendar() components:NSCalendarUnitHour | NSCalendarUnitMinute fromDate:NSDate.date];
     NSInteger nowMinute = nowComponents.hour * 60 + nowComponents.minute;
-    low.lastStartMinute = (nowMinute + 10) % 1440;
-    low.lastEndMinute = (nowMinute + 20) % 1440;
-    if (low.lastEndMinute == 60) low.lastEndMinute = 61;
+    NSInteger start = (nowMinute + 10) % 1440, end = (nowMinute + 20) % 1440;
+    low.lastStartMinute = start;
+    low.lastEndMinute = end;
     low.enabledSwitch.on = YES;
-    low.lastStartMinute = 60;
-    low.lastEndMinute = 390;
     [low draftChanged];
     CHECK(low.hasChanges && low.saveEnabled);
     [container selectPage:1];
@@ -119,11 +191,11 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
     CHECK(battery != (id)low && !battery.enabledSwitch.on);
     [container selectPage:0];
     [container finishPageTransition];
-    CHECK(low.hasChanges && low.lastStartMinute == 60);
+    CHECK(low.hasChanges && low.lastStartMinute == start);
     [low savePressed];
     CHECK(!low.hasChanges && !low.saveEnabled);
     CHECK([low.feedbackLabel.text isEqual:DOLocalizedString(@"PowerSchedule_Saved")]);
-    CHECK(![low.statusText containsString:@"Waiting"]);
+    CHECK([low.statusText isEqual:DOLocalizedString(@"LowPowerSchedule_Confirming")]);
     for (NSString *state in @[@"timerFailed", @"calendarFailed", @"runtimeFailed"]) {
         DOEnvironmentManager.sharedManager.lowState = @{@"Revision": low.savedConfiguration[@"Revision"],
             @"Updated": NSDate.date, @"State": state};
@@ -135,7 +207,7 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
     [container selectPage:1];
     [container finishPageTransition];
     [battery tableView:battery.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:5 inSection:0]];
-    CHECK(battery.lastStartMinute == 60 && battery.lastEndMinute == 390);
+    CHECK(battery.lastStartMinute == start && battery.lastEndMinute == end);
     battery.enabledSwitch.on = YES;
     [battery draftChanged];
     [battery tableView:battery.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];
@@ -147,7 +219,7 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
     CHECK(!battery.timePickerExpanded && !battery.hasChanges && !battery.saveEnabled);
     CHECK([battery.statusText isEqual:[NSString stringWithFormat:DOLocalizedString(@"BatteryRecord_PlannedAt"), DOScheduleDateText(battery.savedConfiguration[@"FirstStart"])]]);
     CHECK(![battery.statusText containsString:@"Unavailable"]);
-    CHECK([DOEnvironmentManager.sharedManager.lowConfig[@"StartMinute"] integerValue] == 60);
+    CHECK([DOEnvironmentManager.sharedManager.lowConfig[@"StartMinute"] integerValue] == start);
     CHECK(![battery.savedConfiguration[@"Revision"] isEqual:low.savedConfiguration[@"Revision"]]);
     BOOL edgeFound = NO;
     for (UIGestureRecognizer *gesture in battery.view.gestureRecognizers)
