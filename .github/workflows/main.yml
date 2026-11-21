@@ -97,17 +97,17 @@ jobs:
           plutil -insert items.5 -xml "<dict><key>cell</key><string>PSGroupCell</string><key>headerCellClass</key><string>DOCreditsCell</string><key>names</key><array><dict><key>name</key><string>${{ github.actor }}</string><key>link</key><string>https://github.com/${{ github.repository }}</string></dict></array></dict>" ./Application/Dopamine/UI/Settings/Credits.plist
           gmake -j$(sysctl -n hw.logicalcpu) NIGHTLY=1
           APP_VERSION="$(cat ./BaseBin/_external/basebin/.version)-$(cat ./BaseBin/_external/basebin/.version-roothide)"
-          VERSION="(${APP_VERSION}-$(git rev-parse --short HEAD))-$(TZ=UTC git show -s --date=format-local:'%Y.%m.%d-%Z-%H.%M.%S' --format='%cd' HEAD)"
-          mv "./Application/Dopamine-roothide-${APP_VERSION}.ipa"  "./Application/roothide-Dopamine-${VERSION}.ipa"
-          mv "./Application/Dopamine-roothide-${APP_VERSION}.tipa" "./Application/roothide-Dopamine-${VERSION}.tipa"
-          echo "version=${VERSION}" >> $GITHUB_ENV
+          installer="DopamineGlass-RH-${shorthash}"
+          for ext in ipa tipa; do
+            mv "Application/Dopamine-roothide-${APP_VERSION}.${ext}" "Application/${installer}.${ext}"
+          done
+          echo "installer=${installer}" >> "$GITHUB_ENV"
 
       - name: Verify packaged RC9 identity and keychain scope
         shell: bash
         run: |
           set -euo pipefail
-          tipa="$(find Application -maxdepth 1 -type f -name 'roothide-Dopamine-*.tipa' -print -quit)"
-          test -n "$tipa"
+          tipa="Application/${installer}.tipa"
           python3 scripts/package-sileo-only.py --verify "$tipa"
           cmp "$tipa" "${tipa%.tipa}.ipa"
           unzip -p "$tipa" Payload/Dopamine.app/Dopamine > "$RUNNER_TEMP/RootHide-Dopamine"
@@ -123,17 +123,16 @@ jobs:
         id: dopamine-latest-upload
         uses: actions/upload-artifact@main
         with:
-          name: Dopamine
-          path: |
-            ${{ github.workspace }}/Application/roothide-Dopamine-${{ env.version }}.ipa
+          name: ${{ env.installer }}.ipa
+          path: Application/${{ env.installer }}.ipa
           archive: false
 
       - name: Upload Artifact(TIPA)
         id: dopamine-latest-upload-tipa
         uses: actions/upload-artifact@main
         with:
-          path: |
-            ${{ github.workspace }}/Application/roothide-Dopamine-${{ env.version }}.tipa
+          name: ${{ env.installer }}.tipa
+          path: Application/${{ env.installer }}.tipa
           archive: false
 
   port-tests:
