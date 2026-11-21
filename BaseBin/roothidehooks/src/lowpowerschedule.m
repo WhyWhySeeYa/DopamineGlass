@@ -315,9 +315,10 @@ static id rcSharedLowPowerScheduler;
         os_log_error(OS_LOG_DEFAULT, "Dopamine low power schedule could not locate the active RootHide environment");
         return;
     }
-    NSDictionary *configuration = rcLowPowerReadDictionary(rcLowPowerConfigurationPath(root));
+    NSString *configurationPath = rcLowPowerConfigurationPath(root);
+    NSDictionary *configuration = rcLowPowerReadDictionary(configurationPath);
     if (!configuration) {
-        BOOL exists = [NSFileManager.defaultManager fileExistsAtPath:rcScheduleReadPath(rcLowPowerConfigurationPath(root))];
+        BOOL exists = [NSFileManager.defaultManager fileExistsAtPath:configurationPath];
         [self publishStatus:exists ? @"invalidConfiguration" : @"disabled"
               configuration:nil root:root next:nil];
         return;

@@ -89,6 +89,8 @@ test('scheduler checks private ABI, arms the next event before applying mode, an
   assert.match(refresh, /self\.retryCount < 4/);
   assert.match(refresh, /self\.retryAfter/);
   assert.match(refresh, /saved\[@"LastHandled"\]/);
+  assert.match(refresh, /NSString \*configurationPath = rcLowPowerConfigurationPath\(root\)/);
+  assert.match(refresh, /fileExistsAtPath:configurationPath/);
 });
 
 test('the iOS 16 void setter is called by the backend and confirmed separately', () => {

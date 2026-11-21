@@ -12,7 +12,7 @@
   "runtimeFiles": {
     "BaseBin/roothidehooks/src/RCLowPowerSchedule.h": "a6d4708c10b6249d5c16765c463cc37d064e5b9cd87af5068b46a16ebf926aa1",
     "BaseBin/roothidehooks/src/RCBatteryRecord.h": "2c9c3cbccaeb33cdcdcb7907e974b6ee154e43d6e027de896237290650491cbb",
-    "BaseBin/roothidehooks/src/lowpowerschedule.m": "0112c1c519b3ffb95950fcabbf840f8f8dea48ba6cef3f0973c2af5823b6c993",
+    "BaseBin/roothidehooks/src/lowpowerschedule.m": "d3b307013f8b20a50ebebfd2f356449d1838721e17dc38a917e9cdf6ee3d4d78",
     "BaseBin/roothidehooks/src/batteryrecord.m": "6fd0a95bfd9cd0faf30691062a5ef5b52ad5eea8a84a03986ff233a80e1ec134"
   },
   "excluded": [
