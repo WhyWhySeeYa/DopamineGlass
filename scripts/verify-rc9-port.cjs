@@ -44,7 +44,12 @@ const checks = {
     const protectedPaths = manifest.contract.protectedPaths;
     const integrations = ['Application/Dopamine/Jailbreak/DOEnvironmentManager.h',
       'Application/Dopamine/Jailbreak/DOEnvironmentManager.m', 'BaseBin/roothidehooks/src/springboard.x'];
-    const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles), 'BaseBin/ChOma']);
+    const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles), 'BaseBin/ChOma', 'Application/Makefile']);
+    const packagingLine = '\tpython3 ../scripts/package-sileo-only.py --app build/Build/Products/Debug-iphoneos/Dopamine.app\n';
+    const appMakefile = read('Application/Makefile').replace(/\r\n/g, '\n');
+    assert.equal(appMakefile.split(packagingLine).length, 2);
+    assert.equal(normalize(appMakefile.replace(packagingLine, '')), normalize(original('Application/Makefile')));
+    assert.ok(appMakefile.indexOf(packagingLine) < appMakefile.indexOf('\tldid -S'));
     // Recover the available upstream pin also used by this exact XPF revision.
     // Do not allow an arbitrary replacement under the build-repair exception.
     const chomaPin = '7dccded6bc17081c08f5f5cdbd7a4b051543a825';
@@ -237,6 +242,7 @@ const checks = {
     assert.match(workflow, /needs: \[uikit-layout, port-tests\]/);
     assert.match(workflow, /DORH_RUN_UIKIT_SIMULATOR: '1'/);
     assert.match(workflow, /node scripts\/verify-app-entitlements\.cjs/);
+    assert.match(workflow, /python3 scripts\/package-sileo-only\.py --verify "\$tipa"/);
     assert.ok(workflow.indexOf('Verify packaged RC9 identity') < workflow.indexOf('- name: Upload Artifact'));
   },
   'existing localized strings are untouched and new authorization labels remain available'() {

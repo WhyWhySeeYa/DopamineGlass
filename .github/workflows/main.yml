@@ -108,6 +108,8 @@ jobs:
           set -euo pipefail
           tipa="$(find Application -maxdepth 1 -type f -name 'roothide-Dopamine-*.tipa' -print -quit)"
           test -n "$tipa"
+          python3 scripts/package-sileo-only.py --verify "$tipa"
+          cmp "$tipa" "${tipa%.tipa}.ipa"
           unzip -p "$tipa" Payload/Dopamine.app/Dopamine > "$RUNNER_TEMP/RootHide-Dopamine"
           unzip -p "$tipa" Payload/Dopamine.app/Info.plist > "$RUNNER_TEMP/RootHide-Info.plist"
           unzip -p "$tipa" Payload/Dopamine.app/Themes.plist > "$RUNNER_TEMP/RootHide-Themes.plist"
@@ -149,6 +151,8 @@ jobs:
           node-version: 22
       - name: Verify glass, authorization and upstream boundaries
         run: node scripts/run-rc9-tests.cjs
+      - name: Verify installer resource customization
+        run: python3 tests/glass-app-archive.test.py
 
   uikit-layout:
     runs-on: macos-15

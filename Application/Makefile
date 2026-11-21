@@ -10,6 +10,7 @@ Dopamine.ipa: build/Build/Products/Debug-iphoneos/Dopamine.app
 	# 不再打包 palera1n，并清理增量构建中的旧框架。
 	rm -rf build/Build/Products/Debug-iphoneos/Dopamine.app/Frameworks/palera1n.framework
 	@echo Ad-Hoc signing Dopamine
+	python3 ../scripts/package-sileo-only.py --app build/Build/Products/Debug-iphoneos/Dopamine.app
 	xattr -rc build/Build/Products/Debug-iphoneos/Dopamine.app
 	ldid -SDopamine/Dopamine.entitlements build/Build/Products/Debug-iphoneos/Dopamine.app/Dopamine
 	ldid -s build/Build/Products/Debug-iphoneos/Dopamine.app
