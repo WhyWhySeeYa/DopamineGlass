@@ -126,7 +126,10 @@ async function run() {
     const data = await command(['simctl', 'get_app_container', device, 'test.roothide.preferences-layout', 'data']);
     const documents = path.join(data, 'Documents');
     const report = path.join(documents, 'report.json');
-    const deadline = Date.now() + 90000;
+    // The full suite includes 2400 table layouts plus home animations and
+    // schedule stress checks. Hosted Intel runs can exceed 90 seconds while
+    // still making progress; keep a bounded five-minute execution budget.
+    const deadline = Date.now() + 300000;
     while (!fs.existsSync(report) && Date.now() < deadline)
       await new Promise(resolve => setTimeout(resolve, 1000));
     fs.mkdirSync(output, { recursive: true });
