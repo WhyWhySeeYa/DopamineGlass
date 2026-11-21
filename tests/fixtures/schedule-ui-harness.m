@@ -263,25 +263,21 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
             cases++;
         }
     }
-    // Stock selection and revoked glass authorization must both remove glass,
-    // retain an opaque page, and preserve the user's unsaved schedule.
+    // Switching appearance must preserve the user's unsaved schedule.
     NSInteger draftStart = low.lastStartMinute;
-    for (NSNumber *stock in @[@YES, @NO]) {
-        TestGlassSelected = !stock.boolValue;
-        TestAuthorization = stock.boolValue;
+    for (NSNumber *authorized in @[@NO, @YES]) {
+        TestAuthorization = authorized.boolValue;
         [container refreshContainerAppearance:nil];
-        CHECK(CGColorGetAlpha(container.view.backgroundColor.CGColor) == 1);
+        CGFloat alpha = TestAuthorization ? 0 : 1;
+        CHECK(CGColorGetAlpha(container.view.backgroundColor.CGColor) == alpha);
         for (DOLowPowerScheduleController *page in container.pages) {
             [page refreshScheduleAppearance];
-            CHECK(CGColorGetAlpha(page.view.backgroundColor.CGColor) == 1);
-            for (DOCustomLiquidGlassView *glass in page.sectionGlassViews.allValues) CHECK(glass.hidden);
+            CHECK(CGColorGetAlpha(page.view.backgroundColor.CGColor) == alpha);
+            if (TestAuthorization) CheckScheduleBackdrops(page);
+            else for (DOCustomLiquidGlassView *glass in page.sectionGlassViews.allValues) CHECK(glass.hidden);
         }
         CHECK(low.lastStartMinute == draftStart);
     }
-    TestGlassSelected = YES;
-    TestAuthorization = YES;
-    [container refreshContainerAppearance:nil];
-    for (DOLowPowerScheduleController *page in container.pages) [page refreshScheduleAppearance];
     [nav willMoveToParentViewController:nil];
     [nav.view removeFromSuperview];
     [nav removeFromParentViewController];

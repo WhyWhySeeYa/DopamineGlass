@@ -6,10 +6,8 @@
 // The material and all geometry/scroll callbacks below come from production.
 /* PRODUCTION_MATERIAL_HEADER */
 static BOOL TestAuthorization = YES;
-static BOOL TestGlassSelected = YES;
 static BOOL DORHSupporterRenderIsVerified(void) { return TestAuthorization; }
-static BOOL DOIsCustomGlassThemeSelected(void) { return TestGlassSelected; }
-static BOOL DOUsesCustomGlassTheme(void) { return TestAuthorization && TestGlassSelected; }
+static BOOL DOUsesCustomGlassTheme(void) { return TestAuthorization; }
 /* PRODUCTION_MATERIAL */
 
 #define CHECK(...) do { if (!(__VA_ARGS__)) @throw [NSException exceptionWithName:@"LayoutFailure" reason:@#__VA_ARGS__ userInfo:nil]; } while (0)
@@ -262,11 +260,9 @@ static NSUInteger CheckAuthorizationBoundary(UIViewController *host)
     DOCustomLiquidGlassView *surface = [[DOCustomLiquidGlassView alloc] initWithCornerRadius:24 baseTintAlpha:0.05];
     surface.frame = CGRectMake(0, 0, 200, 100);
     [host.view addSubview:surface];
-    for (NSNumber *authorized in @[@NO, @YES]) {
-        for (NSNumber *selected in @[@NO, @YES]) {
-            TestAuthorization = authorized.boolValue;
-            TestGlassSelected = selected.boolValue;
-            BOOL enabled = DOUsesCustomGlassTheme();
+    for (NSNumber *authorized in @[@NO, @YES, @NO, @YES]) {
+            BOOL enabled = authorized.boolValue;
+            TestAuthorization = enabled;
             [surface reloadMaterial];
             [surface layoutIfNeeded];
             CHECK(surface.specularGradientLayer.hidden == !enabled);
@@ -304,7 +300,6 @@ static NSUInteger CheckAuthorizationBoundary(UIViewController *host)
                 [page removeFromParentViewController];
                 checks++;
             }
-        }
     }
     // Exercise revocation followed by reauthorization on the same material.
     TestAuthorization = NO;

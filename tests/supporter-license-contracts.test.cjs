@@ -528,10 +528,9 @@ test('device diagnostics disclose persistent key creation and never expose ident
 });
 
 test('authorization limits the glass theme while standalone jailbreak and maintenance remain available', () => {
-  assert.match(themeManager, /if \(!\[value isKindOfClass:NSString\.class\]\)\s*value = DODefaultThemeKey/);
-  assert.match(themeManager, /if \(\[value isEqualToString:DOCustomGlassThemeKey\] && !supporterVerified\)/);
-  assert.doesNotMatch(objcMethod(themeManager, '- (DOTheme*)enabledTheme'), /setPreferenceValue/);
-  assert.match(themeManager, /getThemeForKey:DODefaultThemeKey/);
+  const enabled = objcMethod(themeManager, '- (DOTheme*)enabledTheme');
+  assert.match(enabled, /if \(DORHSupporterIsVerified\(\)\)\s*\{\s*DOTheme \*glass = \[self getThemeForKey:DOCustomGlassThemeKey\];\s*if \(glass\) return glass;\s*\}\s*return \[self getThemeForKey:DODefaultThemeKey\];/);
+  assert.doesNotMatch(enabled, /DOPreferenceManager|preferenceValueForKey|setPreferenceValue/);
   assert.match(themeManager, /theme\.key isEqualToString:DOCustomGlassThemeKey.*!supporterVerified/s);
 
   for (const signature of [
@@ -591,10 +590,9 @@ test('authorization limits the glass theme while standalone jailbreak and mainte
   assert.match(renderer, /self\.specularDarkGradientLayer\.hidden = NO/);
 });
 
-test('unlicensed or stock-theme users construct the real upstream home, not opaque RC9 cards', () => {
+test('unlicensed users see the upstream home; authorization automatically enables glass', () => {
   const gate = fs.readFileSync(path.join(uiRoot, 'DOThemePresentation.h'), 'utf8');
-  assert.match(gate, /return DOIsCustomGlassThemeSelected\(\) && DORHSupporterIsVerified\(\)/);
-  assert.match(gate, /value isKindOfClass:NSString\.class\] && \[value isEqualToString:@"custom_glass"/);
+  assert.match(gate, /DOUsesCustomGlassTheme\(void\)\s*\{\s*return DORHSupporterIsVerified\(\);\s*\}/);
   const load = objcMethod(home, '- (void)viewDidLoad');
   assert.match(load, /self\.customGlassHomeEnabled = DOUsesCustomGlassTheme\(\)/);
   assert.match(load, /if \(self\.customGlassHomeEnabled\)\s*\[self setupCustomGlassHome\];\s*else\s*\[self setupStockHome\]/);
@@ -690,23 +688,22 @@ ${gate}
 int main(void) { @autoreleasepool {
   DOThemeManager *manager = [DOThemeManager new];
   NSMutableArray *themes = [NSMutableArray array];
-  for (NSString *key in @[@"default", @"blue", @"custom_glass"]) {
+  for (NSString *key in @[@"default", @"custom_glass"]) {
     DOTheme *theme = [DOTheme new]; theme.key = key; theme.name = key; [themes addObject:theme];
   }
   manager.themes = themes;
   DOPreferenceManager *preferences = [DOPreferenceManager sharedManager];
   for (NSNumber *state in @[@NO, @YES]) {
     authorized = state.boolValue;
-    for (id selected in @[NSNull.null, @"default", @"blue", @"custom_glass", @"missing", @42]) {
+    for (id selected in @[NSNull.null, @"default", @"blue", @"purple", @"red", @"ellekit", @"custom_glass", @"missing", @42]) {
       preferences.value = selected == NSNull.null ? nil : selected;
       preferences.writes = 0;
-      NSString *expected = [selected isEqual:@"blue"] ? @"blue" :
-        ([selected isEqual:@"custom_glass"] && authorized ? @"custom_glass" : @"default");
+      NSString *expected = authorized ? @"custom_glass" : @"default";
       CHECK([[manager enabledTheme].key isEqualToString:expected]);
       CHECK([[manager getAvailableThemeKeys] containsObject:@"custom_glass"] == authorized);
       CHECK([[manager getAvailableThemeKeys] isEqual:[manager getAvailableThemeNames]]);
       CHECK(preferences.writes == 0);
-      CHECK(DOUsesCustomGlassTheme() == (authorized && [expected isEqualToString:@"custom_glass"]));
+      CHECK(DOUsesCustomGlassTheme() == authorized);
     }
   }
   authorized = YES; preferences.value = @"custom_glass";

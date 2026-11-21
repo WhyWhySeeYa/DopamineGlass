@@ -78,23 +78,11 @@ static NSString * const DODefaultThemeKey = @"default";
 
 - (DOTheme*)enabledTheme
 {
-    DOPreferenceManager *preferences = [DOPreferenceManager sharedManager];
-    BOOL supporterVerified = DORHSupporterIsVerified();
-    id value = [preferences preferenceValueForKey:@"theme"];
-
-    if (![value isKindOfClass:NSString.class])
-        value = DODefaultThemeKey;
-
-    if ([value isEqualToString:DOCustomGlassThemeKey] && !supporterVerified) {
-        // Fall back for this presentation without erasing the user's choice.
-        value = DODefaultThemeKey;
+    if (DORHSupporterIsVerified()) {
+        DOTheme *glass = [self getThemeForKey:DOCustomGlassThemeKey];
+        if (glass) return glass;
     }
-
-    DOTheme *theme = [self getThemeForKey:value];
-    if (theme)
-        return theme;
-
-    return [self getThemeForKey:DODefaultThemeKey] ?: self.themes.firstObject;
+    return [self getThemeForKey:DODefaultThemeKey];
 }
 
 

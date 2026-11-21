@@ -18,8 +18,8 @@
     "runtimeAdaptations": {
       "Application/Dopamine/UI/DOCustomGlassView.m": {
         "sourceSha256": "3b10886527061f217b0ab015274309680c0de662b80732865ef2637c90a37108",
-        "adaptedSha256": "d21efb1de0d9c00828aa05857b9f04ca7c8a2dad1163af4f5064b2617667cadd",
-        "reason": "Glass editing: preserve RC9 rendering and controls; add import failure feedback, atomic parameter commits and authorization lifecycle refresh."
+        "adaptedSha256": "880ab4cc5d9063867590264a712bf63cfeed5b06825216e8269d1e951e0f07e8",
+        "reason": "Glass editing: preserve RC9 rendering and controls; add import failure feedback and atomic parameter commits. Material follows the current authorization state regardless of legacy theme choices."
       },
       "Application/Dopamine/UI/DOSupporterLicense.h": {
         "sourceSha256": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",

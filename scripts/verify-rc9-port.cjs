@@ -45,6 +45,21 @@ const checks = {
     const integrations = ['Application/Dopamine/Jailbreak/DOEnvironmentManager.h',
       'Application/Dopamine/Jailbreak/DOEnvironmentManager.m', 'BaseBin/roothidehooks/src/springboard.x'];
     const allowed = new Set([...integrations, ...Object.keys(migration.runtimeFiles), 'BaseBin/ChOma', 'Application/Makefile']);
+    const assets = 'Application/Dopamine/Assets.xcassets/';
+    const primary = assets + 'AppIcon.appiconset';
+    assert.deepEqual(fs.readdirSync(path.join(root, assets)).filter(name => name.endsWith('.appiconset')), ['AppIcon.appiconset']);
+    const iconHash = crypto.createHash('sha256');
+    for (const name of fs.readdirSync(path.join(root, primary)).sort()) {
+      const file = primary + '/' + name;
+      allowed.add(file);
+      iconHash.update(name + '\0').update(name.endsWith('.json') ? read(file).replace(/\r\n/g, '\n') : fs.readFileSync(path.join(root, file)));
+    }
+    assert.equal(iconHash.digest('hex'), '783f96575dd4c7120186368c91cb47ed6db131a8b61ee01efd44adf4fc5dd1f3', 'RC9 primary icon catalog');
+    for (const dir of ['AppIcon_ElleKit.appiconset', 'AppIcon_Blue.appiconset', 'AppIcon_Red.appiconset', 'AppIcon_Purple.appiconset',
+      ...['Blue','ElleKit','Green','Red'].map(name => `Background/Background_${name}.imageset`)]) {
+      assert.ok(!fs.existsSync(path.join(root, assets + dir)));
+      for (const file of git('ls-tree','-r','--name-only',manifest.upstream.commit,'--',assets + dir).trim().split('\n')) allowed.add(file);
+    }
     const packagingLine = '\tpython3 ../scripts/package-sileo-only.py --app build/Build/Products/Debug-iphoneos/Dopamine.app\n';
     const appMakefile = read('Application/Makefile').replace(/\r\n/g, '\n');
     assert.equal(appMakefile.split(packagingLine).length, 2);
@@ -133,7 +148,7 @@ const checks = {
     assert.match(adapter, /operation\(\);/);
     assert.doesNotMatch(adapter, /int result|Maintenance_Failed/);
   },
-  'settings retain upstream business methods, every original specifier and old theme/icon selection'() {
+  'settings retain upstream business methods and settings except the retired theme picker'() {
     const base = original(settingsPath);
     const current = read(settingsPath);
     const businessSignatures = [...base.matchAll(/^[-+]\s*\([^\n]+?\)[^\n]*\n?\s*\{/gm)]
@@ -143,31 +158,32 @@ const checks = {
       assert.equal(normalize(method(current, signature)), normalize(method(base, signature)), signature);
     let specifiers = method(current, '- (id)specifiers');
     const start = specifiers.indexOf('        PSSpecifier *supporterSpecifier');
-    const end = specifiers.indexOf('        PSSpecifier *themingGroupSpecifier', start);
+    const end = specifiers.indexOf('        PSSpecifier *bootlogoGropSpecifier', start);
     assert.ok(start >= 0 && end > start, 'Supporter entry must be independent of the support matrix');
     specifiers = specifiers.slice(0, start) + specifiers.slice(end);
     const scheduleStart = specifiers.indexOf('                    PSSpecifier *lowPowerSchedule =');
     const scheduleEnd = specifiers.indexOf('                    for (NSDictionary *tool', scheduleStart);
     assert.ok(scheduleStart >= 0 && scheduleEnd > scheduleStart);
     specifiers = specifiers.slice(0, scheduleStart) + specifiers.slice(scheduleEnd);
-    assert.equal(normalize(specifiers), normalize(method(base, '- (id)specifiers')));
-    assert.match(current, /setAlternateIconName:icon/);
+    const upstream = method(base, '- (id)specifiers').replace(/        PSSpecifier \*themingGroupSpecifier[\s\S]*?(?=        PSSpecifier \*bootlogoGropSpecifier)/, '');
+    assert.equal(normalize(specifiers), normalize(upstream));
+    assert.doesNotMatch(current, /setAlternateIconName:|\*themeSpecifier/);
+    assert.doesNotMatch(method(current, '- (void)viewWillAppear:'), /updateBootLogo/);
     assert.match(current, /updateBootLogo/);
     assert.doesNotMatch(current, /customMountBusy|mountCustomDirectoryPressed/);
   },
-  'original theme definitions and alternate app icons coexist with additive Custom Glass'() {
+  'only RC9 default and authorized glass share the purple backdrop'() {
     const file = 'Application/Dopamine/UI/Themes/Themes.plist';
     const dictionaries = text => text.match(/<dict>[\s\S]*?<\/dict>/g) || [];
-    const base = dictionaries(original(file));
     const current = dictionaries(read(file));
-    assert.equal(current.length, base.length + 1);
-    for (const entry of base) assert.ok(current.includes(entry), 'An original theme was modified or removed');
+    assert.equal(current.length, 2);
+    for (const entry of current) assert.match(entry, /<string>Background_Purple\.jpg<\/string>/);
     assert.match(current[0], /<string>default<\/string>/);
     assert.match(current.at(-1), /<string>custom_glass<\/string>/);
     const nav = read('Application/Dopamine/UI/DONavigationController.m');
     assert.match(nav, /DOCustomGlassNavigationThemeKey = @"custom_glass"/);
     const main = read(mainPath);
-    assert.match(main, /setPreferenceValue:@"custom_glass" forKey:@"theme"/);
+    assert.doesNotMatch(main, /forKey:@"theme"/);
     assert.doesNotMatch(main, /setAlternateIconName:nil/);
   },
   'all pre-existing Xcode targets, settings, dependencies and deployment limits are preserved'() {
@@ -192,6 +208,10 @@ const checks = {
       }
       if (actual.isa === 'XCBuildConfiguration' && value.buildSettings.INFOPLIST_KEY_NSPhotoLibraryUsageDescription)
         actual.buildSettings.INFOPLIST_KEY_NSPhotoLibraryUsageDescription = value.buildSettings.INFOPLIST_KEY_NSPhotoLibraryUsageDescription;
+      if (value.buildSettings?.ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES) {
+        assert.equal(actual.buildSettings.ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES, undefined);
+        delete value.buildSettings.ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES;
+      }
       assert.deepEqual(actual, value, id + ': unrelated Xcode object changed');
     }
     const app = current.objects['8C7198142ABF0E82003C6658'];

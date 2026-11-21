@@ -235,7 +235,7 @@ void DOCustomGlassPresentMediaImportError(UIViewController *controller, NSString
 - (void)reloadMaterial
 {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    BOOL supporterVerified = DORHSupporterRenderIsVerified() && DOIsCustomGlassThemeSelected();
+    BOOL supporterVerified = DORHSupporterRenderIsVerified();
 
     if (!supporterVerified) {
         BOOL isBackdropLayer = [NSStringFromClass(self.layer.class) containsString:@"Backdrop"];

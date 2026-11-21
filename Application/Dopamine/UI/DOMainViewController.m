@@ -1554,8 +1554,6 @@ static CGFloat DOHomeThermalHaloExtent(CGFloat diameter) { return MAX(26.0, diam
         if (![self requireCustomGlassSupporterAuthorization])
             return;
 
-        // Opening the RC9 editor opts into its wallpaper without deleting stock themes.
-        [[DOPreferenceManager sharedManager] setPreferenceValue:@"custom_glass" forKey:@"theme"];
         [self.navigationController customGlassRefreshSharedBackground];
         DOCustomGlassThemeSettingsViewController *themeSettingsController =
             [[DOCustomGlassThemeSettingsViewController alloc] init];

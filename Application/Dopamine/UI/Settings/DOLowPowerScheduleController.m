@@ -510,7 +510,7 @@ static NSString * const DOScheduleThemeDidChangeNotification = @"DOCustomGlassTh
 - (void)styleScheduleCell:(UITableViewCell *)cell
 {
     cell.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    cell.backgroundColor = (DOIsCustomGlassThemeSelected() && DORHSupporterRenderIsVerified()) ? UIColor.clearColor :
+    cell.backgroundColor = DORHSupporterRenderIsVerified() ? UIColor.clearColor :
         [UIColor.secondarySystemGroupedBackgroundColor colorWithAlphaComponent:0.82];
     cell.contentView.backgroundColor = UIColor.clearColor;
     cell.backgroundView = nil;
@@ -546,7 +546,7 @@ static NSString * const DOScheduleThemeDidChangeNotification = @"DOCustomGlassTh
             [self.sectionGlassViews removeObjectForKey:key];
         }
     }
-    if (!(DOIsCustomGlassThemeSelected() && DORHSupporterRenderIsVerified())) {
+    if (!DORHSupporterRenderIsVerified()) {
         for (DOCustomLiquidGlassView *glass in self.sectionGlassViews.allValues) glass.hidden = YES;
         return;
     }
@@ -582,7 +582,7 @@ static NSString * const DOScheduleThemeDidChangeNotification = @"DOCustomGlassTh
 
 - (void)refreshScheduleAppearance
 {
-    self.view.backgroundColor = (DOIsCustomGlassThemeSelected() && DORHSupporterRenderIsVerified()) ?
+    self.view.backgroundColor = DORHSupporterRenderIsVerified() ?
         UIColor.clearColor : UIColor.systemGroupedBackgroundColor;
     for (UITableViewCell *cell in self.tableView.visibleCells) [self styleScheduleCell:cell];
     [self refreshScheduleGlassFrames];

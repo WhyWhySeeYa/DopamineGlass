@@ -260,20 +260,11 @@
 - (void)viewWillAppear:(BOOL)arg1
 {
     [super viewWillAppear:arg1];
-    if (_lastKnownTheme != [[DOThemeManager sharedInstance] enabledTheme].key)
+    NSString *theme = [[DOThemeManager sharedInstance] enabledTheme].key;
+    if (![_lastKnownTheme isEqualToString:theme])
     {
+        _lastKnownTheme = theme;
         [DOSceneDelegate relaunch];
-        NSString *icon = [[DOThemeManager sharedInstance] enabledTheme].icon;
-        [[UIApplication sharedApplication] setAlternateIconName:icon completionHandler:^(NSError * _Nullable error) {
-            if (error)
-                NSLog(@"Error changing app icon: %@", error);
-        }];
-
-        if ([DOEnvironmentManager sharedManager].isJailbroken) {
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                [[DOEnvironmentManager sharedManager] updateBootLogo];
-            });
-        }
     }
     [self.view setNeedsLayout];
     [self customGlassThemeDidChange:nil];
@@ -676,19 +667,6 @@
         [supporterSpecifier setProperty:@"checkmark.seal" forKey:@"image"];
         [supporterSpecifier setProperty:@"supporterLicensePressed" forKey:@"action"];
         [specifiers addObject:supporterSpecifier];
-
-        PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
-        themingGroupSpecifier.name = DOLocalizedString(@"Section_Customization");
-        [specifiers addObject:themingGroupSpecifier];
-        
-        PSSpecifier *themeSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Theme") target:self set:defSetter get:defGetter detail:nil cell:PSLinkListCell edit:nil];
-        themeSpecifier.detailControllerClass = [DOPSListItemsController class];
-        [themeSpecifier setProperty:@YES forKey:@"enabled"];
-        [themeSpecifier setProperty:@"theme" forKey:@"key"];
-        [themeSpecifier setProperty:[[self themeIdentifiers] firstObject] forKey:@"default"];
-        [themeSpecifier setProperty:@"themeIdentifiers" forKey:@"valuesDataSource"];
-        [themeSpecifier setProperty:@"themeNames" forKey:@"titlesDataSource"];
-        [specifiers addObject:themeSpecifier];
 
         PSSpecifier *bootlogoGropSpecifier = [PSSpecifier emptyGroupSpecifier];
         bootlogoGropSpecifier.name = DOLocalizedString(@"Section_Boot_Logo");
