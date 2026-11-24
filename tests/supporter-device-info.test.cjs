@@ -9,10 +9,12 @@ const source = fs.readFileSync(path.join(root,'Application/Dopamine/UI/DOSupport
 function definition(name) {
   const match = new RegExp('^static inline [^{;]+\\b'+name+'\\([^;]*?\\)\\s*\\{','m').exec(source);
   assert.ok(match,name);
+  const masked=source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|@?"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g,
+    value=>value.replace(/[^\n]/g,' '));
   let depth=1;
   for(let i=match.index+match[0].length;i<source.length;i++) {
-    if(source[i]==='{')depth++;
-    if(source[i]==='}'&&--depth===0)return source.slice(match.index,i+1);
+    if(masked[i]==='{')depth++;
+    if(masked[i]==='}'&&--depth===0)return source.slice(match.index,i+1);
   }
   assert.fail('Unclosed '+name);
 }
@@ -26,6 +28,7 @@ test('model reporting rejects OS names and retains target hardware and signed-in
   const proof=definition('DORHSupporterCreateRHP1Proof');
   assert.ok(proof.indexOf('device_model')<proof.indexOf('DORHSupporterSignWithDeviceKey('));
   assert.match(proof,/includeDeviceInfo \? 2 : 1/);
+  assert.match(proof,/return proofData;\s*\}$/);
 });
 
 test('native production RHP1 generator interoperates with issuer v1/v2 and signs metadata',{
