@@ -23,8 +23,8 @@
       },
       "Application/Dopamine/UI/DOSupporterLicense.h": {
         "sourceSha256": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
-        "adaptedSha256": "20bd651f9637913d8b53e021271d277d2f425dadfb8dcc0122544438e91c0d5e",
-        "reason": "Custom Glass authorization: retain RC9 protocols, ECID identity, persistent path/format and original read/write operations; adapt denied hardware and persistent I/O to the existing active ZQBB access scope. RC9 2026-11-24: verified bound license backup and signed v2 device proof; preserve target glass access adapters and legacy authorization."
+        "adaptedSha256": "b011f88d6573a9e167e6e9da162acdd5c422a038a496d6c0cc248223a63178ba",
+        "reason": "Custom Glass authorization: retain RC9 protocols, ECID identity, persistent path/format and original read/write operations; adapt denied hardware and persistent I/O to the existing active ZQBB access scope. RC9 2026-11-24: verified bound license backup and signed v2 device proof; reject OS names as models and fall back to hw.machine; preserve target glass access adapters and legacy authorization."
       },
       "Application/Dopamine/UI/DOSupporterLicenseUI.h": {
         "sourceSha256": "0c88f214d7ac30e9356f7ecb96cfbf99ec7db46660a9f82c062913af9d776d85",

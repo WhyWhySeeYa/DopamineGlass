@@ -6,6 +6,8 @@ const tests = [
   'tests/glass-app-build.test.cjs',
   'tests/glass-ui-contracts.test.cjs',
   'tests/supporter-license-contracts.test.cjs',
+  'tests/supporter-device-info.test.cjs',
+  'tests/supporter-shared-issuer.test.cjs',
   'tests/supporter-binding.test.cjs',
   'tests/supporter-key-review.test.cjs',
   'tests/supporter-issuer-integration.test.cjs',
