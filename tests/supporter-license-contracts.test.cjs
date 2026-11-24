@@ -93,7 +93,7 @@ test('access adapters preserve RC9 license operations outside the persistence I/
     .replace('*failureCode = hardware[@"error_code"] ? [hardware[@"error_code"] integerValue] : -1;', '*failureCode = -1;')
     .replace(/\r\n/g, '\n').trim();
   assert.equal(require('node:crypto').createHash('sha256').update(tail).digest('hex'),
-    'a2d6dda5d505ebe32761793e5da9fb85fd55680d7233ddec5e19252ed3b23e45');
+    '5305fb8fdc1c0bf33462cca4ea629025592dbd02d7d96b8ddc0f7c78b3985dbf');
 });
 
 test('native Foundation executes hardware identity fallback, canonical hashes and failure diagnostics', {
@@ -306,6 +306,21 @@ test('authorization actions use matching numbered labels and brief copied-proof 
     licenseUI.indexOf('DOLocalizedString(@"Supporter_Device_Proof_Ready")'));
 });
 
+test('backup only copies a verified bound pair and can be restored by the existing importer', () => {
+  const backup = body('DORHSupporterBoundActivationBackupText');
+  const restore = body('DORHSupporterStoreActivationText');
+  assert.ok(backup.indexOf('DORHSupporterLicenseTombstoned()') < backup.indexOf('DORHSupporterVerifyBoundLicense('));
+  assert.match(backup, /DORHSupporterPersistentString\(DORHSupporterPersistentLicenseCodeKey\)/);
+  assert.match(backup, /DORHSupporterPersistentString\(DORHSupporterBindingCertificateKey\)/);
+  assert.match(backup, /!DORHSupporterVerifyBoundLicense\(license, certificate, NULL\)\) return nil/);
+  assert.match(backup, /return \[NSString stringWithFormat:@"%@\\n%@", license, certificate\]/);
+  assert.doesNotMatch(backup, /DORHSupporterWritePersistentState|DORHSupporterSetPersistentString/);
+  assert.match(restore, /componentsSeparatedByCharactersInSet:NSCharacterSet\.whitespaceAndNewlineCharacterSet/);
+  assert.match(restore, /tokens\.count == 2 && \[tokens\[0\] hasPrefix:@"RH1\."\] && \[tokens\[1\] hasPrefix:@"RHB1\."\]/);
+  assert.match(licenseUI, /if \(\[info\[@"binding_status"\] isEqualToString:@"bound"\]\)\s*\{\s*\[alert addAction:[^\n]*Supporter_Backup_Bound_License/);
+  assert.match(licenseUI, /setItems:@\[@\{@"public\.utf8-plain-text": backup\}\]\s*options:@\{UIPasteboardOptionLocalOnly: @YES\}/);
+});
+
 test('brief user guides preserve the app step numbers when existing users skip device-code submission', () => {
   const guides = ['03-发给用户-授权与设备绑定步骤.txt', '04-发给旧用户-补发授权步骤.txt']
     .map(name => fs.readFileSync(path.join(root, '授权流程说明', name), 'utf8'));
@@ -404,7 +419,7 @@ test('native Foundation saves, reloads and removes RC9 state through signed-inst
   try {
     const harness = fs.readFileSync(path.join(root, 'tests/helpers/supporter-persistence-main.m'), 'utf8')
       .replace('__PERSISTENCE_SOURCE__', section(source, 'static inline NSString *DORHSupporterPersistentStatePath', 'static inline NSString *DORHSupporterEmbeddedDeviceCode'))
-      .replace('__STORE_SOURCE__', section(source, 'static inline BOOL DORHSupporterStoreLicenseCode', 'static inline BOOL DORHSupporterStoreActivationText'))
+      .replace('__STORE_SOURCE__', section(source, 'static inline BOOL DORHSupporterStoreLicenseCode', 'static inline BOOL DORHSupporterRemoveLicense'))
       .replace('__REMOVE_SOURCE__', source.slice(source.indexOf('static inline BOOL DORHSupporterRemoveLicense')));
     const file = path.join(directory, 'main.m');
     const executable = path.join(directory, 'persistence-test');

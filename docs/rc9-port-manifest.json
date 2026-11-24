@@ -23,13 +23,13 @@
       },
       "Application/Dopamine/UI/DOSupporterLicense.h": {
         "sourceSha256": "747e82f704bc6fcd9b1164483eccabab1d670ae98cf41005b8ae898c8f64b093",
-        "adaptedSha256": "a43fcae935d69c926455aea7f7310d27f6b32ffc3336a6121d2fc0649dc74f43",
-        "reason": "Custom Glass authorization: retain RC9 protocols, ECID identity, persistent path/format and original read/write operations; adapt denied hardware and persistent I/O to the existing active ZQBB access scope."
+        "adaptedSha256": "20bd651f9637913d8b53e021271d277d2f425dadfb8dcc0122544438e91c0d5e",
+        "reason": "Custom Glass authorization: retain RC9 protocols, ECID identity, persistent path/format and original read/write operations; adapt denied hardware and persistent I/O to the existing active ZQBB access scope. RC9 2026-11-24: verified bound license backup and signed v2 device proof; preserve target glass access adapters and legacy authorization."
       },
       "Application/Dopamine/UI/DOSupporterLicenseUI.h": {
         "sourceSha256": "0c88f214d7ac30e9356f7ecb96cfbf99ec7db46660a9f82c062913af9d776d85",
-        "adaptedSha256": "66966506e6d932cf120a5aba7636fa33916ad624aedad28439b9d4fb3e84b006",
-        "reason": "Custom Glass authorization: show hardware-access prerequisites and distinguish verified-but-unsaved activation from invalid licenses."
+        "adaptedSha256": "d6e77b61da7dd83336637c66d0759c834da461e104d488d07b9bfdd17e3f9cf5",
+        "reason": "Custom Glass authorization: show hardware-access prerequisites and distinguish verified-but-unsaved activation from invalid licenses. RC9 2026-11-24: verified bound license backup and signed v2 device proof; preserve target glass access adapters and legacy authorization."
       },
       "Application/Dopamine/UI/DOCustomGlassMediaStore.h": {
         "sourceSha256": "c8b3c36074502153e7d0919bc6d4df43e941218f7a27eba4795e1ee7f39e79bc",

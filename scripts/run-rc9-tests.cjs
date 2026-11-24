@@ -8,6 +8,7 @@ const tests = [
   'tests/supporter-license-contracts.test.cjs',
   'tests/supporter-binding.test.cjs',
   'tests/supporter-key-review.test.cjs',
+  'tests/supporter-issuer-integration.test.cjs',
   'tests/lowpower-schedule-contracts.test.cjs',
   'tests/battery-record.test.cjs',
 ];

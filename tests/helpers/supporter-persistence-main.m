@@ -8,6 +8,7 @@ static NSString * const DORHSupporterPersistentDeviceCodeKey = @"DeviceCode";
 static NSString * const DORHSupporterPersistentLicenseCodeKey = @"LicenseCode";
 static NSString * const DORHSupporterPersistentLicenseRemovedKey = @"LicenseRemoved";
 static NSString * const DORHSupporterBindingCertificateKey = @"BindingCertificate";
+static NSString * const DORHSupporterBindingRequiredKey = @"BindingRequired";
 static NSString * const DORHSupporterLicenseDefaultsKey = @"DORHSupporter.LicenseCode";
 static NSString * const DORHSupporterLicenseDidChangeNotification = @"license-change";
 static BOOL denyOrdinary, denyAllWrites, installedThroughTrollStore, jailbreakActive, allowRoot;
@@ -82,6 +83,19 @@ static NSDictionary *DORHSupporterVerifyLicenseCode(NSString *license, NSError *
     CHECK(!rootScope && !unsandboxedScope);
     return [license hasPrefix:@"valid"] ? @{@"sid": @"test"} : nil;
 }
+// Crypto and hardware validation are exercised by supporter-binding.test.cjs.
+// These doubles isolate production backup/import persistence and failure order.
+static BOOL boundDeviceMatches = YES;
+static NSDictionary *DORHSupporterVerifyBoundLicense(NSString *license, NSString *certificate, NSError **error) {
+    CHECK(!rootScope && !unsandboxedScope);
+    return boundDeviceMatches && [license isEqual:@"RH1.TEST"] && [certificate isEqual:@"RHB1.TEST"]
+        ? @{@"sid": @"test"} : nil;
+}
+static NSString *DORHSupporterEmbeddedDeviceCode(NSString *license) { return @"stable-code"; }
+static NSString *DORHSupporterSHA256(NSData *data) { return @"test-hash"; }
+static NSDictionary *DORHSupporterBindingCertificateInfo(NSString *certificate, NSError **error) {
+    return [certificate isEqual:@"RHB1.TEST"] ? @{@"license_sha256": @"test-hash"} : nil;
+}
 static void DORHSupporterInvalidateRenderAuthorization(void) {
     CHECK(!rootScope && !unsandboxedScope);
     invalidations++;
@@ -144,6 +158,26 @@ int main(int argc, char **argv) { @autoreleasepool {
     CHECK([DORHSupporterPersistentString(@"LicenseCode") isEqual:@"valid-two"]);
     CHECK(DORHSupporterStoreLicenseCode(@"valid-three", &error));
     CHECK(rootAttempts == oldAttempts);
+    CHECK(DORHSupporterBoundActivationBackupText() == nil); // legacy authorization remains usable
+    CHECK(DORHSupporterStoreActivationText(@"RH1.TEST\nRHB1.TEST", &error));
+    NSString *backup = DORHSupporterBoundActivationBackupText();
+    CHECK([backup isEqual:@"RH1.TEST\nRHB1.TEST"]);
+    oldWrites = writes;
+    CHECK([DORHSupporterBoundActivationBackupText() isEqual:backup] && writes == oldWrites);
+    boundDeviceMatches = NO;
+    CHECK(DORHSupporterBoundActivationBackupText() == nil);
+    CHECK(!DORHSupporterStoreActivationText(backup, &error) && writes == oldWrites);
+    boundDeviceMatches = YES;
+    CHECK(!DORHSupporterStoreActivationText(@"RH1.TEST\nRHB1.TAMPERED", &error) && writes == oldWrites);
+    CHECK(DORHSupporterRemoveLicense());
+    CHECK(DORHSupporterBoundActivationBackupText() == nil);
+    CHECK(DORHSupporterStoreActivationText(backup, &error));
+    CHECK([DORHSupporterBoundActivationBackupText() isEqual:backup]);
+    CHECK([DORHSupporterReadPersistentState()[DORHSupporterBindingRequiredKey] boolValue]);
+    denyAllWrites = YES;
+    saved = DORHSupporterReadPersistentState();
+    CHECK(!DORHSupporterStoreActivationText(backup, &error) && error.code == 28);
+    CHECK([DORHSupporterReadPersistentState() isEqual:saved]);
     [NSNotificationCenter.defaultCenter removeObserver:observer];
     [testDefaults removePersistentDomainForName:suite];
     return 0;

@@ -125,6 +125,34 @@ test('home uses the RC9 safe-area layout instead of stretching or scaling a whol
   assert.doesNotMatch(main, /self\.contentView|MAX\(size\.height, availableHeight\)|systemLayoutSizeFittingSize:/);
 });
 
+test('home launch thermal status uses four static colors and always returns to the avatar', () => {
+  const thermal = section(main, '\n- (void)displayHomeThermalState:', '\n- (void)startHomeThermalUpdates');
+  for (const [state, localized, color] of [
+    ['Nominal', 'Nominal', 'Green'], ['Fair', 'Fair', 'Yellow'],
+    ['Serious', 'Serious', 'Orange'], ['Critical', 'Critical', 'Red'],
+  ]) {
+    assert.ok(thermal.includes('case NSProcessInfoThermalState' + state + ':\n' +
+      '            title = DOLocalizedString(@"Thermal_State_' + localized + '");\n' +
+      '            color = UIColor.system' + color + 'Color;'));
+  }
+  assert.match(thermal, /temperatureIcon\.tintColor = color/);
+  const reveal = section(main, '\n- (void)revealHomeThermalStateInAvatar:', '\n- (void)applyHomeAvatarDisplayMode\n{');
+  assert.match(reveal, /activationState != UISceneActivationStateForegroundActive/);
+  assert.match(reveal, /if \(DOHomeThermalLaunchRevealConsumed\) return/);
+  assert.ok(reveal.indexOf('DOHomeThermalLaunchRevealConsumed = YES') < reveal.indexOf('if (self.customGlassAvatarHidden) return'));
+  assert.match(reveal, /scheduledTimerWithTimeInterval:fade \+ 3\.0 repeats:NO/);
+  assert.match(reveal, /self\.homeThermalAvatarOverlay\.alpha = 0\.0/);
+  assert.match(reveal, /self\.customGlassAvatarPhotoView\.alpha = 1\.0/);
+  assert.doesNotMatch(main, /DOHomeThermalHaloView|homeThermalBreath|playBreath|breathingLayer/);
+  for (const locale of ['en', 'zh-Hans', 'zh-CN', 'zh-Hant']) {
+    const strings = read('Application/Dopamine/' + locale + '.lproj/Localizable.strings');
+    for (const key of ['Home_Thermal_State_Format', 'Thermal_State_Nominal', 'Thermal_State_Fair',
+      'Thermal_State_Serious', 'Thermal_State_Critical', 'Home_Avatar_Display_Title',
+      'Home_Avatar_Show_Photo', 'Home_Avatar_Collapse_Hint', 'Home_Avatar_Expand_Hint',
+      'Home_Avatar_Always', 'Home_Avatar_Hidden']) assert.ok(strings.includes('"' + key + '" ='));
+  }
+});
+
 test('RC9 action-panel dimensions and jailbreak-bar offsets are retained', () => {
   for (const declaration of [
     'CGFloat mainSpacing = compactLayout ? 8.0 : 12.0;',
@@ -195,16 +223,45 @@ test('username and motto editors use saved user input rather than treating place
   assert.match(main, /initWithTarget:self action:@selector\(presentCustomGlassMottoEditor\)/);
 });
 
-test('avatar visibility modes persist atomically and gestures restore without shifting the main stack', () => {
-  const focus = section(main, '- (CGFloat)customGlassAvatarHiddenOffset', '- (void)configureCustomGlassHeaderView:');
-  assert.match(focus, /DOCustomGlassThemeSyncCommitChanges/);
-  assert.match(focus, /DOCustomGlassTheme.AvatarVisibility/);
-  assert.match(focus, /restoreHomeAvatarVisibilityPreference/);
-  assert.match(focus, /scheduleHomeAvatarAutoHide/);
-  assert.match(focus, /translationInView:self\.view/);
-  assert.match(focus, /fabs\(translation\.x\) >= 28\.0/);
-  assert.match(focus, /accessibilityElementsHidden = hidden/);
-  assert.doesNotMatch(focus, /mainStack|setCustomSpacing/);
+test('only the avatar slides offscreen and either edge restores it', () => {
+  const gestures = section(main, '- (CGFloat)customGlassAvatarHiddenOffset', '- (void)customGlassAvatarLongPressed:');
+  assert.match(gestures, /CGAffineTransformMakeTranslation\(offset, 0\.0\)/);
+  assert.match(gestures, /customGlassAvatarLeftEdge\.enabled = hidden;/);
+  assert.match(gestures, /customGlassAvatarRightEdge\.enabled = hidden;/);
+  assert.match(gestures, /fabs\(velocity\.x\) <= fabs\(velocity\.y\)/);
+  assert.match(gestures, /UIGestureRecognizerStateCancelled/);
+  assert.doesNotMatch(gestures, /detailAlpha|menuTravel|customGlassActionGrid\.alpha|jailbreakBtn\.alpha/);
+  assert.doesNotMatch(main, /customGlassFocusTravel|setCustomGlassProfileFocusEnabled|applyCustomGlassFocusProgress/);
+  assert.match(main, /usernameLabel\.topAnchor constraintEqualToAnchor:profileView\.topAnchor constant:avatarSize \+ avatarToUsernameSpacing/);
+});
+
+test('leaving the screen or hiding the avatar cancels the one-shot thermal reveal', () => {
+  const reset = section(main, '\n- (void)applyHomeAvatarDisplayMode\n{', '\n- (void)startHomeThermalUpdates\n{');
+  assert.match(reset, /homeThermalRevealTimer invalidate/);
+  assert.match(reset, /homeThermalRevealGeneration\+\+/);
+  assert.match(reset, /homeThermalAvatarOverlay\.alpha = 0\.0/);
+  assert.match(reset, /customGlassAvatarPhotoView\.alpha = 1\.0/);
+  const hide = section(main, '- (void)setCustomGlassAvatarHidden:', '- (void)viewDidLayoutSubviews');
+  assert.match(hide, /if \(hidden\) \[self applyHomeAvatarDisplayMode\]/);
+  const stop = section(main, '\n- (void)stopHomeThermalUpdates\n{', '- (void)homeThermalStateDidChange:');
+  assert.match(stop, /\[self applyHomeAvatarDisplayMode\]/);
+  assert.doesNotMatch(main, /homeAvatarHideTimer|scheduleHomeAvatarAutoHide|AvatarTemperatureMode/);
+});
+
+test('avatar visibility and hidden side are remembered and long press cannot open after dragging', () => {
+  const gesture = section(main, '- (void)customGlassAvatarLongPressed:', '- (void)configureCustomGlassHeaderView:');
+  assert.match(gesture, /gesture\.state != UIGestureRecognizerStateEnded \|\| self\.customGlassAvatarWasDragged/);
+  assert.match(gesture, /popoverPresentationController\.sourceView = self\.customGlassAvatarContainerView/);
+  assert.match(gesture, /@\[@"Home_Avatar_Always", @"Home_Avatar_Hidden"\]/);
+  assert.doesNotMatch(gesture, /Home_Avatar_Auto|Home_Avatar_Show_Temperature/);
+  assert.match(main, /avatarTap requireGestureRecognizerToFail:self\.customGlassAvatarLongPress/);
+  const restore = section(main, '- (void)restoreHomeAvatarVisibilityPreference', '- (void)selectHomeAvatarVisibilityMode:');
+  assert.match(restore, /integerForKey:DOHomeAvatarVisibilityKey\] == 2 \? 2 : 1/);
+  assert.match(restore, /boolForKey:DOHomeAvatarHiddenRightKey/);
+  const pan = section(main, '- (void)customGlassAvatarPanned:', '- (void)customGlassAvatarLongPressed:');
+  assert.match(pan, /DOCustomGlassThemeSyncCommitChanges/);
+  assert.match(pan, /DOHomeAvatarVisibilityKey:@\(hidden \? 2 : 1\)/);
+  assert.match(pan, /DOHomeAvatarHiddenRightKey:@\(restoring \? self\.customGlassAvatarHiddenRight : right\)/);
 });
 
 test('shared wallpaper handles images, video and Live Photo with persisted speed', () => {
@@ -442,7 +499,7 @@ void otherRelease(NSString *filename);
 static NSData *UIImageJPEGRepresentation(UIImage *image, double quality) { return image.data; }
 ${read('tests/helpers/glass-theme-access.m')}
 ${theme}
-${section(main, 'static NSString *DOCustomGlassLimitedText', 'static NSString * const DOHomeThermalBreathKey')}
+${section(main, 'static NSString *DOCustomGlassLimitedText', 'static NSString * const DOHomeAvatarVisibilityKey')}
 ${section(media, 'static inline NSURL *DOCustomGlassMediaStoreSandboxContainerURL', 'static inline NSURL *DOCustomGlassMediaStoreContainerURL')}
 ${store}
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "check failed at line %d\\n", __LINE__); return 1; } } while (0)

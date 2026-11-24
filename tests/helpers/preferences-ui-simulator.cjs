@@ -25,7 +25,7 @@ function harnessSource() {
   const lowPower = read(ui + 'Settings/DOLowPowerScheduleController.m');
   const stripLocalImports = source => source.replace(/^#(?:import "[^"\n]+"|pragma once).*$/gm, '');
   const replacements = {
-    HOME_VIEWS: section(home, 'static NSString * const DOHomeThermalBreathKey', '@interface DOMainViewController'),
+    HOME_VIEWS: section(home, 'static NSString * const DOHomeAvatarVisibilityKey', '@interface DOMainViewController'),
     HOME_ENTRANCE_PROPERTIES: section(home, '@property(nonatomic, strong) UIView *homeEntranceHeader;', '@property(nonatomic) BOOL hideStatusBar;'),
     HOME_ENTRANCE: section(home, '\n- (void)prepareHomeEntrance\n{', '// 显示主页时刷新信息及越狱按钮状态。'),
     HOME_FOCUS: section(home, '- (CGFloat)customGlassAvatarHiddenOffset', '- (void)configureCustomGlassHeaderView:'),
