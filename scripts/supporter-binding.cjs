@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const issuerPoint = 'BCmHM/nGP4wG1hJ4mOedvUeRutsHgL+qGAAWpjTO/bD0qY4QraFv/hzsQTV0jxx7fod1yu9iAC0LHiVxW39cRBg=';
+const issuerPoint = 'BO5GqFDxPfDI4xcnIXNQ3pFiTysx35uqA9ECjrT3KSuJF6e2dsAymJrhZ6dUbcdXHEhkD2ymg1uTNopdejF9Q/U=';
 const bindingDomain = Buffer.from('DopamineRH-RHB1-Sign-v1\0', 'ascii');
 const codePattern = /^(?:[0-9A-F]{4}-){7}[0-9A-F]{4}$/;
 const hashPattern = /^[0-9A-F]{64}$/;

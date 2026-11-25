@@ -1701,7 +1701,7 @@ static inline SecKeyRef DORHSupporterCreatePublicKey(void)
     // intentionally kept outside the app/repository and is only used by the
     // offline issuer script.
     static NSString * const publicKeyBase64 =
-        @"BCmHM/nGP4wG1hJ4mOedvUeRutsHgL+qGAAWpjTO/bD0qY4QraFv/hzsQTV0jxx7fod1yu9iAC0LHiVxW39cRBg=";
+        @"BO5GqFDxPfDI4xcnIXNQ3pFiTysx35uqA9ECjrT3KSuJF6e2dsAymJrhZ6dUbcdXHEhkD2ymg1uTNopdejF9Q/U=";
     NSData *publicKeyData = [[NSData alloc] initWithBase64EncodedString:publicKeyBase64 options:0];
     if (publicKeyData.length != 65)
         return nil;
