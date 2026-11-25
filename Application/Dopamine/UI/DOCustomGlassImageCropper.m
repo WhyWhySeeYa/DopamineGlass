@@ -121,7 +121,7 @@
 
 - (void)layoutCropperWithBounds:(CGSize)bounds
 {
-    // Crop frame: fixed aspect, centered, leaving room for the buttons.
+    // Crop frame: fixed aspect, centred, leaving room for the buttons.
     CGFloat maxWidth = bounds.width - 48.0;
     CGFloat maxHeight = bounds.height - 190.0;
     CGFloat aspect = self.aspectSize.width / self.aspectSize.height;
@@ -147,18 +147,19 @@
     self.maskLayer.frame = (CGRect){CGPointZero, bounds};
     self.maskLayer.path = path.CGPath;
 
-    // Initial scale: fill the crop frame.
+    // Keep the image view at its natural size; UIScrollView owns all scaling.
     CGSize imageSize = self.sourceImage.size;
     if (imageSize.width <= 0 || imageSize.height <= 0) return;
+    self.imageView.frame = CGRectMake(0, 0, imageSize.width, imageSize.height);
+
     CGFloat scaleX = self.cropRect.size.width / imageSize.width;
     CGFloat scaleY = self.cropRect.size.height / imageSize.height;
     CGFloat minScale = MAX(scaleX, scaleY);
 
-    self.imageView.frame = CGRectMake(0, 0, imageSize.width * minScale, imageSize.height * minScale);
-    self.scrollView.contentSize = self.imageView.bounds.size;
-    self.scrollView.minimumZoomScale = 1.0;
-    self.scrollView.maximumZoomScale = MAX(1.0, 3.0);
-    self.scrollView.zoomScale = 1.0;
+    self.scrollView.contentSize = imageSize;
+    self.scrollView.minimumZoomScale = minScale;
+    self.scrollView.maximumZoomScale = minScale * 4.0;
+    self.scrollView.zoomScale = minScale;
     [self centerContent];
 }
 
@@ -166,19 +167,12 @@
 
 - (void)centerContent
 {
-    CGFloat contentWidth = self.scrollView.contentSize.width;
-    CGFloat contentHeight = self.scrollView.contentSize.height;
+    CGFloat zoom = self.scrollView.zoomScale;
+    CGFloat contentWidth = self.scrollView.contentSize.width * zoom;
+    CGFloat contentHeight = self.scrollView.contentSize.height * zoom;
     CGFloat insetX = MAX((self.scrollView.bounds.size.width - contentWidth) / 2.0, 0);
     CGFloat insetY = MAX((self.scrollView.bounds.size.height - contentHeight) / 2.0, 0);
     self.scrollView.contentInset = UIEdgeInsetsMake(insetY, insetX, insetY, insetX);
-
-    // Align the crop frame with the image centre on first layout.
-    if (self.scrollView.zoomScale == 1.0 && self.scrollView.contentOffset.y == -insetY) {
-        CGPoint target = CGPointMake(
-            (contentWidth - self.scrollView.bounds.size.width) / 2.0,
-            (contentHeight - self.scrollView.bounds.size.height) / 2.0);
-        [self.scrollView setContentOffset:target animated:NO];
-    }
 }
 
 - (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView
@@ -188,8 +182,9 @@
 
 - (void)scrollViewDidZoom:(UIScrollView *)scrollView
 {
-    CGFloat contentWidth = scrollView.contentSize.width;
-    CGFloat contentHeight = scrollView.contentSize.height;
+    CGFloat zoom = scrollView.zoomScale;
+    CGFloat contentWidth = scrollView.contentSize.width * zoom;
+    CGFloat contentHeight = scrollView.contentSize.height * zoom;
     CGFloat insetX = MAX((scrollView.bounds.size.width - contentWidth) / 2.0, 0);
     CGFloat insetY = MAX((scrollView.bounds.size.height - contentHeight) / 2.0, 0);
     scrollView.contentInset = UIEdgeInsetsMake(insetY, insetX, insetY, insetX);
@@ -218,28 +213,27 @@
 {
     if (!self.sourceImage.CGImage) return self.sourceImage;
 
-    // Crop rect expressed in the scroll view's content coordinate space.
+    // Crop rect expressed in the scroll view's content space (zoom applied).
     CGRect cropInContent = [self.scrollView convertRect:self.cropRect fromView:self.view];
     CGFloat zoom = MAX(self.scrollView.zoomScale, 0.0001);
-    CGRect cropInImageBounds = CGRectMake(
+    CGRect cropInImage = CGRectMake(
         cropInContent.origin.x / zoom,
         cropInContent.origin.y / zoom,
         cropInContent.size.width / zoom,
         cropInContent.size.height / zoom);
 
-    // imageView.bounds == the scaled image (points). Convert to CGImage pixels.
+    // imageView.bounds == natural image size (points); convert to CGImage pixels.
+    CGSize natural = self.sourceImage.size;
     CGFloat imageW = (CGFloat)CGImageGetWidth(self.sourceImage.CGImage);
     CGFloat imageH = (CGFloat)CGImageGetHeight(self.sourceImage.CGImage);
-    CGFloat viewW = MAX(self.imageView.bounds.size.width, 1.0);
-    CGFloat viewH = MAX(self.imageView.bounds.size.height, 1.0);
-    CGFloat pixelScaleX = imageW / viewW;
-    CGFloat pixelScaleY = imageH / viewH;
+    CGFloat pixelScaleX = imageW / MAX(natural.width, 1.0);
+    CGFloat pixelScaleY = imageH / MAX(natural.height, 1.0);
 
     CGRect pixelRect = CGRectMake(
-        cropInImageBounds.origin.x * pixelScaleX,
-        cropInImageBounds.origin.y * pixelScaleY,
-        cropInImageBounds.size.width * pixelScaleX,
-        cropInImageBounds.size.height * pixelScaleY);
+        cropInImage.origin.x * pixelScaleX,
+        cropInImage.origin.y * pixelScaleY,
+        cropInImage.size.width * pixelScaleX,
+        cropInImage.size.height * pixelScaleY);
     pixelRect = CGRectIntegral(CGRectIntersection(pixelRect, CGRectMake(0, 0, imageW, imageH)));
     if (CGRectIsEmpty(pixelRect)) return self.sourceImage;
 
