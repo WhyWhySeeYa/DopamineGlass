@@ -267,9 +267,20 @@ static NSUInteger CheckScheduleUI(UIViewController *host, NSString *documents)
             [page.tableView reloadData];
             [page.tableView layoutIfNeeded];
             // Batch updates retire their old header/footer views on the next
-            // run-loop turn, even when row animations are disabled. Let that
-            // cleanup finish after the preceding rapid expansion stress case.
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            // run-loop turn, even when row animations are disabled. Poll until
+            // every section exposes at most one mounted footer label: a fixed
+            // sleep is not reliable on slower CI runners.
+            for (NSUInteger settle = 0; settle < 20; settle++) {
+                [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+                [page.tableView layoutIfNeeded];
+                BOOL clean = YES;
+                for (NSInteger s = 0; s < page.tableView.numberOfSections; s++) {
+                    NSMutableArray<UILabel *> *probe = [NSMutableArray new];
+                    ScheduleLabels(page.tableView, [page footerTextForSection:s], probe);
+                    if (probe.count > 1) { clean = NO; break; }
+                }
+                if (clean) break;
+            }
             [page.tableView layoutIfNeeded];
             CheckScheduleBackdrops(page);
             CHECK(page.sectionGlassViews.count >= 2);
