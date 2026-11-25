@@ -32,7 +32,7 @@
     DOCustomGlassImageCropper *cropper = [DOCustomGlassImageCropper new];
     cropper.sourceImage = image;
     cropper.shape = shape;
-    cropper.aspectSize = (aspectSize.width > 0 && aspectSize.height > 0) ? aspectSize : CGSizeMake(1, 1);
+    cropper.aspectSize = aspectSize;  // CGSizeZero enables the free (largest box) mode
     cropper.completion = completion;
     cropper.modalPresentationStyle = UIModalPresentationFullScreen;
     return cropper;
@@ -121,15 +121,21 @@
 
 - (void)layoutCropperWithBounds:(CGSize)bounds
 {
-    // Crop frame: fixed aspect, centred, leaving room for the buttons.
+    // Crop frame: fixed aspect when requested, otherwise the largest usable box.
     CGFloat maxWidth = bounds.width - 48.0;
     CGFloat maxHeight = bounds.height - 190.0;
-    CGFloat aspect = self.aspectSize.width / self.aspectSize.height;
-    CGFloat width = maxWidth;
-    CGFloat height = width / aspect;
-    if (height > maxHeight) {
+    CGFloat width, height;
+    if (self.aspectSize.width <= 0 || self.aspectSize.height <= 0) {
+        width = maxWidth;
         height = maxHeight;
-        width = height * aspect;
+    } else {
+        CGFloat aspect = self.aspectSize.width / self.aspectSize.height;
+        width = maxWidth;
+        height = width / aspect;
+        if (height > maxHeight) {
+            height = maxHeight;
+            width = height * aspect;
+        }
     }
     self.cropRect = CGRectMake((bounds.width - width) / 2.0,
                                (bounds.height - height) / 2.0 - 20.0,

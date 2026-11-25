@@ -20,7 +20,7 @@ typedef NS_ENUM(NSInteger, DOCustomGlassCropShape) {
 
 /// @param image       source image (already loaded, orientation normalized)
 /// @param shape       rectangle or circle mask
-/// @param aspectSize  crop frame aspect, e.g. CGSizeMake(9, 19.5) for a full screen wallpaper
+/// @param aspectSize  crop frame aspect; pass CGSizeZero for the largest free box
 /// @param completion  called with the rendered crop, or nil when cancelled
 + (instancetype)cropperWithImage:(UIImage *)image
                            shape:(DOCustomGlassCropShape)shape

@@ -1167,14 +1167,11 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (request.cancelled || !weakSelf)
                     return;
-                // Fixed screen aspect keeps the wallpaper undistorted.
-                CGSize screenSize = UIScreen.mainScreen.bounds.size;
-                if (screenSize.width <= 0 || screenSize.height <= 0)
-                    screenSize = CGSizeMake(9, 19.5);
+                // Free aspect: the crop box is the largest usable area.
                 DOCustomGlassImageCropper *cropper =
                     [DOCustomGlassImageCropper cropperWithImage:image
                                                           shape:DOCustomGlassCropShapeRectangle
-                                                     aspectSize:screenSize
+                                                     aspectSize:CGSizeZero
                                                      completion:^(UIImage *cropped) {
                     if (!cropped) return;  // cancelled
                     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
