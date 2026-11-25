@@ -64,9 +64,12 @@ const checks = {
       for (const file of git('ls-tree','-r','--name-only',manifest.upstream.commit,'--',assets + dir).trim().split('\n')) allowed.add(file);
     }
     const packagingLine = '\tpython3 ../scripts/package-sileo-only.py --app build/Build/Products/Debug-iphoneos/Dopamine.app\n';
+    const bundleLine = /\tplutil -replace CFBundleIdentifier -string "[^"]*"\n/g;
     const appMakefile = read('Application/Makefile').replace(/\r\n/g, '\n');
     assert.equal(appMakefile.split(packagingLine).length, 2);
-    assert.equal(normalize(appMakefile.replace(packagingLine, '')), normalize(original('Application/Makefile')));
+    // Bundle identifier is intentionally fork-owned (aligned with RC7 for in-place upgrade).
+    assert.equal(normalize(appMakefile.replace(packagingLine, '').replace(bundleLine, '')),
+      normalize(original('Application/Makefile').replace(bundleLine, '')));
     assert.ok(appMakefile.indexOf(packagingLine) < appMakefile.indexOf('\tldid -S'));
     // Recover the available upstream pin also used by this exact XPF revision.
     // Do not allow an arbitrary replacement under the build-repair exception.
@@ -224,6 +227,9 @@ const checks = {
         assert.equal(actual.buildSettings.ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES, undefined);
         delete value.buildSettings.ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES;
       }
+      // Bundle identifier is intentionally fork-owned (aligned with RC7 for in-place upgrade).
+      if (value.buildSettings?.PRODUCT_BUNDLE_IDENTIFIER)
+        actual.buildSettings.PRODUCT_BUNDLE_IDENTIFIER = value.buildSettings.PRODUCT_BUNDLE_IDENTIFIER;
       assert.deepEqual(actual, value, id + ': unrelated Xcode object changed');
     }
     const app = current.objects['8C7198142ABF0E82003C6658'];
