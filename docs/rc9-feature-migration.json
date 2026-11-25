@@ -13,7 +13,8 @@
     "BaseBin/roothidehooks/src/RCLowPowerSchedule.h": "a6d4708c10b6249d5c16765c463cc37d064e5b9cd87af5068b46a16ebf926aa1",
     "BaseBin/roothidehooks/src/RCBatteryRecord.h": "2c9c3cbccaeb33cdcdcb7907e974b6ee154e43d6e027de896237290650491cbb",
     "BaseBin/roothidehooks/src/lowpowerschedule.m": "d3b307013f8b20a50ebebfd2f356449d1838721e17dc38a917e9cdf6ee3d4d78",
-    "BaseBin/roothidehooks/src/batteryrecord.m": "6fd0a95bfd9cd0faf30691062a5ef5b52ad5eea8a84a03986ff233a80e1ec134"
+    "BaseBin/roothidehooks/src/batteryrecord.m": "6fd0a95bfd9cd0faf30691062a5ef5b52ad5eea8a84a03986ff233a80e1ec134",
+    "BaseBin/jbctl/src/main.m": "226ede15f604990599b0af5f018f40da11d94072b12c3ed66ce099531c907489"
   },
   "excluded": [
     "iOS16-only support pruning",
@@ -43,7 +44,12 @@
     "productionCodeCommit": "432671c7ac6754f4411a909760ccf6971445ba75",
     "nativeCompileRun": 44790059639,
     "nativeCompileConclusion": "success",
-    "macOSRegression": { "total": 137, "passed": 136, "failed": 0, "skipped": 1 },
+    "macOSRegression": {
+      "total": 137,
+      "passed": 136,
+      "failed": 0,
+      "skipped": 1
+    },
     "pushedCommit": "05fb2d613d5d70dab818c73a75c6c10a5e83831b",
     "uiKitRun": 44795923786,
     "uiKitConclusion": "UNCONFIRMED; last observed in_progress; subsequent status query rejected",
