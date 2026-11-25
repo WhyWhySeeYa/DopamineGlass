@@ -121,7 +121,17 @@ async function run() {
     await command(['simctl', 'boot', device]);
     // A clean iOS runtime migrates its data store on first boot; allow that once, bounded.
     await command(['simctl', 'bootstatus', device, '-b'], 420000);
-    await command(['simctl', 'install', device, app], 120000);
+    // Simulator installs occasionally stall on busy Intel runners; retry with
+    // a longer ceiling before failing the whole layout audit.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await command(['simctl', 'install', device, app], 300000);
+        break;
+      } catch (error) {
+        if (attempt >= 3) throw error;
+        await command(['simctl', 'bootstatus', device, '-b'], 180000).catch(() => {});
+      }
+    }
     const data = await command(['simctl', 'get_app_container', device, 'test.roothide.preferences-layout', 'data']);
     const documents = path.join(data, 'Documents');
     await command(['simctl', 'launch', device, 'test.roothide.preferences-layout']);

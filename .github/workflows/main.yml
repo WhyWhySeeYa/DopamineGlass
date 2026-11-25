@@ -180,7 +180,7 @@ jobs:
 
   uikit-layout:
     runs-on: macos-15-intel
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: maxim-lobanov/setup-xcode@v1
