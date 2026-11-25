@@ -81,7 +81,7 @@ RHC1 解析通过后出现 `hardware-identity / -1`，表示生成 RHP1 时无�
 
 ## 数据与授权兼容
 
-- Bundle ID 仍为 `cn.zqbb.dopaRH`，版本来源仍为上游 3.0.13-30；没有手动改版号冒充升级。
+- Bundle ID 仍为 `com.opa334.Dopamine-roothide`，版本来源仍为上游 3.0.13-30；没有手动改版号冒充升级。
 - RH1/RHB1 协议、公钥、旧设备码和授权偏好键未改。签发私钥不进入 App，未读取真实签发目录。
 - 授权持久化保留 `/var/mobile/Library/Application Support/DopamineRH/supporter-state.plist`。
 - 主题同步保留 RC9 实现的 `/var/mobile/Library/Application Support/DopamineRH-iOS16/glass-theme.plist`。目录名只是历史存储命名，不代表移植后的 App 被限制为 iOS16。

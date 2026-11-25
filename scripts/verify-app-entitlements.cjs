@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const applicationIdentifier = 'cn.zqbb.dopaRH';
+const applicationIdentifier = 'com.opa334.Dopamine-roothide';
 
 function verifyAppEntitlements(entitlements, info) {
   assert.ok(entitlements && typeof entitlements === 'object');

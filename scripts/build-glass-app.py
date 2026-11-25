@@ -173,7 +173,7 @@ def package(work, built, out):
     if seal.exists():
         shutil.rmtree(seal)
     info = plistlib.loads((final / 'Info.plist').read_bytes())
-    if info['CFBundleIdentifier'] != 'cn.zqbb.dopaRH':
+    if info['CFBundleIdentifier'] != 'com.opa334.Dopamine-roothide':
         raise ValueError('Bundle identity changed')
     info['CFBundleShortVersionString'] = '3.0.13-30'
     info['DOBuildTimestamp'] = int(os.environ.get('SOURCE_DATE_EPOCH', '1793932230'))

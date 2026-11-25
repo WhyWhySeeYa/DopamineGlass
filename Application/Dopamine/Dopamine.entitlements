@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
 	<key>application-identifier</key>
-	<string>cn.zqbb.dopaRH</string>
+	<string>com.opa334.Dopamine-roothide</string>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>cn.zqbb.dopaRH</string>
+		<string>com.opa334.Dopamine-roothide</string>
 	</array>
 	<key>platform-application</key>
 	<true/>

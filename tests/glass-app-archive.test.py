@@ -94,7 +94,7 @@ class PackageIntegrityTests(unittest.TestCase):
         (official / 'Dopamine').write_bytes(b'original-executable')
         (built / 'Dopamine').write_bytes(b'rebuilt-executable')
         (built / 'libchoma.dylib').write_bytes(b'MUST-NOT-REPLACE-OFFICIAL')
-        (built / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'cn.zqbb.dopaRH'}))
+        (built / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'com.opa334.Dopamine-roothide'}))
         (built / 'Themes.plist').write_bytes(plistlib.dumps({'custom_glass': {}}))
         provenance = {'sourceCommit': 'a' * 40, 'preservedCore': {name: hashlib.sha256(contents).hexdigest() for name, contents in data.items()}}
         provenance['packageCustomizationInputs'] = {name: build.sha256(official / name) for name in build.PACKAGE_CUSTOMIZATION_INPUTS}

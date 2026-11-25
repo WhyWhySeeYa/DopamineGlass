@@ -338,7 +338,7 @@ test('brief user guides preserve the app step numbers when existing users skip d
 });
 
 test('packaged entitlement verifier rejects missing, broad or mismatched keychain permissions', () => {
-  const info = { CFBundleIdentifier: 'cn.zqbb.dopaRH' };
+  const info = { CFBundleIdentifier: 'com.opa334.Dopamine-roothide' };
   const valid = {
     'application-identifier': info.CFBundleIdentifier,
     'keychain-access-groups': [info.CFBundleIdentifier],
@@ -392,7 +392,7 @@ test('source entitlements pass the native plist parser and scoped keychain contr
     `], { encoding: 'utf8' });
   }
   assert.equal(result.status, 0, result.stderr);
-  verifyAppEntitlements(JSON.parse(result.stdout), { CFBundleIdentifier: 'cn.zqbb.dopaRH' });
+  verifyAppEntitlements(JSON.parse(result.stdout), { CFBundleIdentifier: 'com.opa334.Dopamine-roothide' });
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/main.yml'), 'utf8');
   assert.match(workflow, /unzip -p "\$tipa" Payload\/Dopamine\.app\/Dopamine/);
   assert.match(workflow, /ldid -e .*RootHide-Dopamine.* > app-entitlements\.plist/);

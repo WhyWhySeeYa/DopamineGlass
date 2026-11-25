@@ -49,7 +49,7 @@
     }
   },
   "contract": {
-    "bundleIdentifier": "cn.zqbb.dopaRH",
+    "bundleIdentifier": "com.opa334.Dopamine-roothide",
     "themeKey": "custom_glass",
     "authorizationScope": "Custom Glass only; preserve upstream jailbreak access",
     "protectedPaths": [
