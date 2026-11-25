@@ -894,6 +894,8 @@
 				042479A02B66916B0082581B /* DOGlobalAppearance.m */,
 
 				A91611040000000000000002 /* DOCustomGlassView.m */,
+				A91611040000000000000020 /* DOCustomGlassImageCropper.m */,
+				A91611040000000000000021 /* DOCustomGlassImageCropper.h */,
 				A91611040000000000000003 /* DOCustomGlassView.h */,
 				A91611040000000000000004 /* DOCustomGlassMediaStore.h */,
 				A91611040000000000000005 /* DOCustomGlassThemeSync.h */,
@@ -2373,6 +2375,7 @@
 				BC2026112000000000000001 /* DOBatteryRecordController.m in Sources */,
 
 				A91611040000000000000001 /* DOCustomGlassView.m in Sources */,
+				A91611040000000000000022 /* DOCustomGlassImageCropper.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3466,12 +3469,15 @@
 
 /* RC9 glass and offline authorization: additive project objects. */
 		A91611040000000000000001 /* DOCustomGlassView.m in Sources */ = {isa = PBXBuildFile; fileRef = A91611040000000000000002 /* DOCustomGlassView.m */; };
+		A91611040000000000000022 /* DOCustomGlassImageCropper.m in Sources */ = {isa = PBXBuildFile; fileRef = A91611040000000000000020 /* DOCustomGlassImageCropper.m */; };
 		A91611040000000000000010 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000011 /* AVFoundation.framework */; };
 		A91611040000000000000012 /* Photos.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000013 /* Photos.framework */; };
 		A91611040000000000000014 /* PhotosUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000015 /* PhotosUI.framework */; };
 		A91611040000000000000016 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000017 /* CoreImage.framework */; };
 		A91611040000000000000018 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A91611040000000000000019 /* QuartzCore.framework */; };
 		A91611040000000000000002 /* DOCustomGlassView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOCustomGlassView.m; sourceTree = "<group>"; };
+		A91611040000000000000020 /* DOCustomGlassImageCropper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOCustomGlassImageCropper.m; sourceTree = "<group>"; };
+		A91611040000000000000021 /* DOCustomGlassImageCropper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOCustomGlassImageCropper.h; sourceTree = "<group>"; };
 		A91611040000000000000003 /* DOCustomGlassView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOCustomGlassView.h; sourceTree = "<group>"; };
 		A91611040000000000000004 /* DOCustomGlassMediaStore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOCustomGlassMediaStore.h; sourceTree = "<group>"; };
 		A91611040000000000000005 /* DOCustomGlassThemeSync.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOCustomGlassThemeSync.h; sourceTree = "<group>"; };

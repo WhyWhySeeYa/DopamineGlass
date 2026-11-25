@@ -17,6 +17,7 @@
 #import "DOThemePresentation.h"
 #import "DOSceneDelegate.h"
 #import "DOCustomGlassMediaStore.h"
+#import "DOCustomGlassImageCropper.h"
 #import "DONavigationController.h"
 #import "DOSupporterLicense.h"
 #import "Settings/DOSettingsController.h"
@@ -448,23 +449,37 @@ static BOOL DOHomeEntranceConsumed = NO;
         }
 
         UIImage *image = (UIImage *)object;
-        UIImage *persistedAvatar = nil;
-        BOOL saved = DOCustomGlassMediaStoreSaveAvatar(image, request, &persistedAvatar);
-
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (request.cancelled)
+            if (request.cancelled || !weakSelf)
                 return;
-            if (!saved) {
-                DOCustomGlassPresentMediaImportError(weakSelf, @"Glass_Media_Save_Failed");
-                return;
-            }
+            // Let the user choose the visible square; avatars render as circles.
+            DOCustomGlassImageCropper *cropper =
+                [DOCustomGlassImageCropper cropperWithImage:image
+                                                      shape:DOCustomGlassCropShapeCircle
+                                                 aspectSize:CGSizeMake(1, 1)
+                                                 completion:^(UIImage *cropped) {
+                if (!cropped) return;  // cancelled
+                dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                    UIImage *persistedAvatar = nil;
+                    BOOL saved = DOCustomGlassMediaStoreSaveAvatar(cropped, request, &persistedAvatar);
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (request.cancelled || !weakSelf)
+                            return;
+                        if (!saved) {
+                            DOCustomGlassPresentMediaImportError(weakSelf, @"Glass_Media_Save_Failed");
+                            return;
+                        }
 
-            // Show the exact object decoded back from the committed media file.
-            weakSelf.customGlassAvatarPhotoView.image = persistedAvatar;
-            weakSelf.customGlassAvatarPhotoView.hidden = NO;
-            // The docked lens makes the photo translucent; never let the
-            // placeholder glyph show through a real avatar.
-            weakSelf.customGlassAvatarFallbackIconView.hidden = YES;
+                        // Show the exact object decoded back from the committed media file.
+                        weakSelf.customGlassAvatarPhotoView.image = persistedAvatar;
+                        weakSelf.customGlassAvatarPhotoView.hidden = NO;
+                        // The docked lens makes the photo translucent; never let the
+                        // placeholder glyph show through a real avatar.
+                        weakSelf.customGlassAvatarFallbackIconView.hidden = YES;
+                    });
+                });
+            }];
+            [weakSelf presentViewController:cropper animated:YES completion:nil];
         });
     }];
 }

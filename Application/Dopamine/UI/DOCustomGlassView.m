@@ -1,5 +1,6 @@
 #import "DOCustomGlassView.h"
 #import "DOCustomGlassMediaStore.h"
+#import "DOCustomGlassImageCropper.h"
 #import "DOGlobalAppearance.h"
 #import "DOUIManager.h"
 #import "DOSupporterLicense.h"
@@ -1162,8 +1163,27 @@ static void DOCustomGlassExportLivePhoto(PHLivePhoto *livePhoto,
                 return;
             }
 
-            BOOL saved = DOCustomGlassMediaStoreSaveWallpaper((UIImage *)object, request, NULL);
-            finishWallpaperImport(saved);
+            UIImage *image = (UIImage *)object;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (request.cancelled || !weakSelf)
+                    return;
+                // Fixed screen aspect keeps the wallpaper undistorted.
+                CGSize screenSize = UIScreen.mainScreen.bounds.size;
+                if (screenSize.width <= 0 || screenSize.height <= 0)
+                    screenSize = CGSizeMake(9, 19.5);
+                DOCustomGlassImageCropper *cropper =
+                    [DOCustomGlassImageCropper cropperWithImage:image
+                                                          shape:DOCustomGlassCropShapeRectangle
+                                                     aspectSize:screenSize
+                                                     completion:^(UIImage *cropped) {
+                    if (!cropped) return;  // cancelled
+                    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                        BOOL saved = DOCustomGlassMediaStoreSaveWallpaper(cropped, request, NULL);
+                        finishWallpaperImport(saved);
+                    });
+                }];
+                [weakSelf presentViewController:cropper animated:YES completion:nil];
+            });
         }];
     };
 
