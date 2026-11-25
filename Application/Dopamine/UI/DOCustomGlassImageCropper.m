@@ -139,7 +139,7 @@
     self.frameView.layer.cornerRadius = self.shape == DOCustomGlassCropShapeCircle ?
         MIN(self.cropRect.size.width, self.cropRect.size.height) / 2.0 : 12.0;
 
-    UIBezierPath *path = [UIBezierPath bezierPathWithRect:bounds];
+    UIBezierPath *path = [UIBezierPath bezierPathWithRect:(CGRect){CGPointZero, bounds}];
     UIBezierPath *hole = self.shape == DOCustomGlassCropShapeCircle ?
         [UIBezierPath bezierPathWithOvalInRect:self.cropRect] :
         [UIBezierPath bezierPathWithRoundedRect:self.cropRect cornerRadius:12.0];
