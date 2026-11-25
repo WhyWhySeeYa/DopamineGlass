@@ -64,7 +64,7 @@ const checks = {
       for (const file of git('ls-tree','-r','--name-only',manifest.upstream.commit,'--',assets + dir).trim().split('\n')) allowed.add(file);
     }
     const packagingLine = '\tpython3 ../scripts/package-sileo-only.py --app build/Build/Products/Debug-iphoneos/Dopamine.app\n';
-    const bundleLine = /\tplutil -replace CFBundleIdentifier -string "[^"]*"\n/g;
+    const bundleLine = /\tplutil -replace CFBundleIdentifier -string "[^"]*"[^\n]*\n/g;
     const appMakefile = read('Application/Makefile').replace(/\r\n/g, '\n');
     assert.equal(appMakefile.split(packagingLine).length, 2);
     // Bundle identifier is intentionally fork-owned (aligned with RC7 for in-place upgrade).
