@@ -44,12 +44,20 @@ jobs:
         with:
           packages: ldid findutils sed coreutils make
 
-      - name: Install better GNU Make
+      - name: Cache THEOS toolchain
+        id: cache-theos
+        uses: actions/cache@v4
+        with:
+          path: theos
+          key: theos-${{ runner.os }}-${{ hashFiles('Makefile', 'Application/Makefile', 'BaseBin/Makefile') }}
+
+      - name: Install better GNU Make and libarchive
         run: |
-          brew install make
+          brew install make libarchive
           echo "PATH=$(brew --prefix make)/libexec/gnubin:$PATH" >> $GITHUB_ENV
 
       - name: Install THEOS
+        if: steps.cache-theos.outputs.cache-hit != 'true'
         run: |
           set -x
           export BASEDIR="$(pwd)"
@@ -64,15 +72,25 @@ jobs:
           rm $THEOS/sdks/iPhoneOS16.5.sdk.tar
           cd $BASEDIR
 
-      - name: Build and Install trustcache
+      - name: Cache trustcache binary
+        id: cache-trustcache
+        uses: actions/cache@v4
+        with:
+          path: ~/trustcache-build/trustcache
+          key: trustcache-${{ runner.os }}-v1
+
+      - name: Build trustcache
+        if: steps.cache-trustcache.outputs.cache-hit != 'true'
         run: |
           set -x
-          git clone https://github.com/CRKatri/trustcache
-          cd trustcache
+          git clone https://github.com/CRKatri/trustcache ~/trustcache-build
+          cd ~/trustcache-build
           export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
           export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch arm64"
           gmake -j$(sysctl -n hw.logicalcpu) OPENSSL=1
-          sudo cp trustcache /opt/procursus/bin/
+
+      - name: Install trustcache
+        run: sudo cp ~/trustcache-build/trustcache /opt/procursus/bin/
 
       - name: Set Environment Variables
         run: |
@@ -83,10 +101,6 @@ jobs:
           echo "ctime=${T2}" >> $GITHUB_ENV
           echo "ctimestamp=${TS}" >> $GITHUB_ENV
           echo "shorthash=${SHASH}" >> $GITHUB_ENV
-
-      - name: Install libarchive
-        run: |
-          brew install libarchive
 
       - name: Build
         run: |

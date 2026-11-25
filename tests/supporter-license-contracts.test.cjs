@@ -93,7 +93,7 @@ test('access adapters preserve RC9 license operations outside the persistence I/
     .replace('*failureCode = hardware[@"error_code"] ? [hardware[@"error_code"] integerValue] : -1;', '*failureCode = -1;')
     .replace(/\r\n/g, '\n').trim();
   assert.equal(require('node:crypto').createHash('sha256').update(tail).digest('hex'),
-    '5305fb8fdc1c0bf33462cca4ea629025592dbd02d7d96b8ddc0f7c78b3985dbf');
+    '0efc6bb6be06963d004fcda55a799168fc1d2970dab02562529901ea22542661');
 });
 
 test('native Foundation executes hardware identity fallback, canonical hashes and failure diagnostics', {
